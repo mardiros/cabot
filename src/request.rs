@@ -140,6 +140,13 @@ impl RequestBuilder {
         self
     }
 
+    pub fn add_headers(mut self, headers: &[&str]) -> Self {
+        for header in headers {
+            self.headers.push(header.to_string());
+        }
+        self
+    }
+
     pub fn set_body(mut self, body: &str) -> Self {
         self.body = Some(body.to_owned());
         self
@@ -284,6 +291,7 @@ mod tests {
             .set_http_method("POST")
             .set_http_version("HTTP/1.0")
             .add_header("Content-Type: application/json")
+            .add_headers(&["Accept-Encoding: deflate", "Accept-Language: fr"])
             .set_body("{}");
         let request = builder.build().unwrap();
         assert_eq!(request.host(), "localhost".to_string());
@@ -293,7 +301,10 @@ mod tests {
         assert_eq!(request.request_uri(), "/");
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
         assert_eq!(request.headers,
-                   vec!["Content-Type: application/json".to_string()]);
+                   vec!["Content-Type: application/json".to_string(),
+                        "Accept-Encoding: deflate".to_string(),
+                        "Accept-Language: fr".to_string(),
+                        ]);
 
         let builder = builder.set_url("http://[::1]/path");
         let request = builder.build().unwrap();
@@ -304,7 +315,10 @@ mod tests {
         assert_eq!(request.http_method(), "POST".to_string());
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
         assert_eq!(request.headers,
-                   vec!["Content-Type: application/json".to_string()]);
+                   vec!["Content-Type: application/json".to_string(),
+                        "Accept-Encoding: deflate".to_string(),
+                        "Accept-Language: fr".to_string(),
+                        ]);
 
         let builder = builder.set_url("not_an_url");
         let err = builder.build();

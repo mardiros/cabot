@@ -19,6 +19,12 @@ pub fn run() -> CabotResult<()> {
             .long("request")
             .default_value("GET")
             .help("Specify request command to use"))
+        .arg(Arg::with_name("LINE")
+            .short("H")
+            .long("header")
+            .takes_value(true)
+            .multiple(true)
+            .help("Pass custom header LINE to server"))
         .arg(Arg::with_name("URL")
             .index(1)
             .required(true)
@@ -27,12 +33,13 @@ pub fn run() -> CabotResult<()> {
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
+    let headers: Vec<&str> = matches.values_of("LINE").unwrap().collect();
 
-    let request = RequestBuilder::new(url).set_http_method(http_method)
+    let request =  RequestBuilder::new(url)
+        .set_http_method(http_method)
+        .add_headers(&headers.as_slice())
         .build()?;
-    debug!("URL: {}", url);
 
-    debug!("Parsed URL: {}", url);
     let response = http::http_query(&request)?;
     println!("{}", String::from_utf8_lossy(response.as_slice()));
     Ok(())
