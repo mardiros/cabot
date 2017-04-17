@@ -1,3 +1,8 @@
+use std::io;
+use std::io::Write;
+use std::io::prelude::*;
+use std::fs::File;
+
 use clap::{App, Arg};
 use url::Url;
 
@@ -9,11 +14,11 @@ pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
         .version("0.1.0")
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
-<<<<<<< HEAD
-        .about("client URL request library riir")
-=======
         .about("http(s) client")
->>>>>>> 315dc97... fixup! Add minimal working version
+        .arg(Arg::with_name("URL")
+            .index(1)
+            .required(true)
+            .help("URL to request"))
         .arg(Arg::with_name("REQUEST")
             .short("X")
             .long("request")
@@ -25,22 +30,34 @@ pub fn run() -> CabotResult<()> {
             .takes_value(true)
             .multiple(true)
             .help("Pass custom header LINE to server"))
-        .arg(Arg::with_name("URL")
-            .index(1)
-            .required(true)
-            .help("URL to request"))
+        .arg(Arg::with_name("FILE")
+            .short("o")
+            .long("output")
+            .takes_value(true)
+            .multiple(true)
+            .help("Write to FILE instead of stdout"))
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
-    let headers: Vec<&str> = matches.values_of("LINE").unwrap().collect();
 
-    let request =  RequestBuilder::new(url)
+    let headers: Vec<&str> = match matches.values_of("LINE") {
+        Some(headers) => headers.collect(),
+        None =>  Vec::new(),
+    };
+
+    let request = RequestBuilder::new(url)
         .set_http_method(http_method)
         .add_headers(&headers.as_slice())
         .build()?;
 
-    let response = http::http_query(&request)?;
-    println!("{}", String::from_utf8_lossy(response.as_slice()));
+    if let Some(path) = matches.value_of("FILE") {
+        let mut f = File::create(path).unwrap();
+        http::http_query(&request, &mut f)?;
+    }
+    else {
+        http::http_query(&request, &mut io::stdout())?;
+    };
+
     Ok(())
 }

@@ -12,7 +12,7 @@ use super::request::Request;
 use super::results::{CabotResult, CabotError};
 use super::dns::Resolver;
 
-pub fn from_http(request: &Request, mut client: &mut TcpStream) -> CabotResult<Vec<u8>> {
+pub fn from_http(request: &Request, mut client: &mut TcpStream, mut out: &mut Write) -> CabotResult<()> {
 
     let mut response: Vec<u8> = Vec::new();
     let request_str = request.to_string();
@@ -20,13 +20,12 @@ pub fn from_http(request: &Request, mut client: &mut TcpStream) -> CabotResult<V
     debug!("Sending request {}", request_str);
     client.write(request_str.as_bytes()).unwrap();
     client.read_to_end(&mut response).unwrap();
-
-    Ok(response)
+    out.write_all(response.as_slice());
+    Ok(())
 }
 
-pub fn from_https(request: &Request, mut client: &mut TcpStream) -> CabotResult<Vec<u8>> {
+pub fn from_https(request: &Request, mut client: &mut TcpStream, mut out: &mut Write) -> CabotResult<()> {
 
-    let mut response: Vec<u8> = Vec::new();
     let request_str = request.to_string();
 
     let mut config = ClientConfig::new();
@@ -43,9 +42,9 @@ pub fn from_https(request: &Request, mut client: &mut TcpStream) -> CabotResult<
 
         if tlsclient.wants_read() {
             let count = tlsclient.read_tls(&mut client);
-            if count.is_err() {
-                // FIXME
-                return Err(CabotError::IOError("Connection closed".to_string()));
+            if let Err(err) = count {
+                error!("{:?}", err);
+                return Err(CabotError::IOError(format!("{}", err)));
             }
 
             let count = count.unwrap();
@@ -61,7 +60,7 @@ pub fn from_https(request: &Request, mut client: &mut TcpStream) -> CabotResult<
             let mut part: Vec<u8> = Vec::new();
             let clearcount = tlsclient.read_to_end(&mut part);
             if let Err(err) = clearcount {
-                response.append(&mut part);
+                out.write_all(&part.as_slice());
                 if err.kind() == io::ErrorKind::ConnectionAborted {
                     break;
                 }
@@ -71,18 +70,18 @@ pub fn from_https(request: &Request, mut client: &mut TcpStream) -> CabotResult<
                 let clearcount = clearcount.unwrap();
                 debug!("Read {} clear bytes", clearcount);
                 if clearcount > 0 {
-                    response.append(&mut part);
+                    out.write_all(&part.as_slice());
                 }
             }
         } else {
             break;
         }
     }
-    Ok(response)
+    Ok(())
 }
 
 
-pub fn http_query(request: &Request) -> CabotResult<Vec<u8>> {
+pub fn http_query(request: &Request, mut out: &mut Write) -> CabotResult<()> {
     debug!("{} {}", request.http_method(), request.request_uri());
 
     let resolver = Resolver::new();
@@ -95,14 +94,15 @@ pub fn http_query(request: &Request) -> CabotResult<Vec<u8>> {
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
     let response = match request.scheme() {
-        "http" => from_http(request, &mut client)?,
-        "https" => from_https(request, &mut client)?,
+        "http" => from_http(request, &mut client, &mut out)?,
+        "https" => from_https(request, &mut client, &mut out)?,
         _ => {
             return Err(CabotError::SchemeError(format!("Unrecognized scheme {}", request.scheme())))
         }
     };
 
+    out.flush().unwrap();
 
-    Ok(response)
+    Ok(())
 
 }
