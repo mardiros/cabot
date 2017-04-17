@@ -1,0 +1,14 @@
+[package]
+name = "cabot"
+version = "0.1.0"
+authors = ["Guillaume Gauvrit <guillaume@gauvr.it>"]
+
+[dependencies]
+
+clap = "^2.21.1"
+log = "^0.3.7"
+pretty_env_logger = "^0.1.0"
+
+rustls = "^0.5.8"
+webpki-roots = "^0.7.0"
+url = "^1.4.0"
