@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
-use std::io::{self, Write};
+use std::io::{self, Write, stderr};
 use std::io::prelude::*;
 use std::net::{TcpStream, ToSocketAddrs};
 
@@ -12,19 +12,57 @@ use super::request::Request;
 use super::results::{CabotResult, CabotError};
 use super::dns::Resolver;
 
-pub fn from_http(request: &Request, mut client: &mut TcpStream, mut out: &mut Write) -> CabotResult<()> {
+fn verbose_request(request: &str) {
+    let mut split = request.split("\r\n");
+    for part in split {
+        writeln!(&mut stderr(), "> {}", part).unwrap();
+    }
+}
 
-    let mut response: Vec<u8> = Vec::new();
+fn verbose_response(request: &str) {
+    let mut split = request.split("\n");
+    for part in split {
+        writeln!(&mut stderr(), "< {}", part).unwrap();
+    }
+    writeln!(&mut stderr(), "<").unwrap();
+}
+
+pub fn from_http(request: &Request,
+                 mut client: &mut TcpStream,
+                 mut out: &mut Write,
+                 verbose: bool)
+                 -> CabotResult<()> {
+
     let request_str = request.to_string();
+    if verbose {
+        verbose_request(&request_str);
+    }
 
     debug!("Sending request {}", request_str);
     client.write(request_str.as_bytes()).unwrap();
-    client.read_to_end(&mut response).unwrap();
-    out.write_all(response.as_slice());
+
+    let mut response = String::new();
+    client.read_to_string(&mut response).unwrap();
+    let mut response: Vec<&str> = response.splitn(2, "\r\n\r\n").collect();
+    if verbose {
+        if response.len() == 2 {
+            verbose_response(response.get(0).unwrap());
+            writeln!(&mut stderr(),
+                     "{} [{} bytes data]",
+                     "{",
+                     response.get(1).unwrap().len()
+                     ).unwrap();
+        }
+    }
+    out.write_all(response.get(1).unwrap().as_bytes());
     Ok(())
 }
 
-pub fn from_https(request: &Request, mut client: &mut TcpStream, mut out: &mut Write) -> CabotResult<()> {
+pub fn from_https(request: &Request,
+                  mut client: &mut TcpStream,
+                  mut out: &mut Write,
+                  verbose: bool)
+                  -> CabotResult<()> {
 
     let request_str = request.to_string();
 
@@ -32,6 +70,9 @@ pub fn from_https(request: &Request, mut client: &mut TcpStream, mut out: &mut W
     config.root_store.add_trust_anchors(&webpki_roots::ROOTS);
     let rc_config = Arc::new(config);
     let mut tlsclient = ClientSession::new(&rc_config, request.host());
+    if verbose {
+        verbose_request(&request_str);
+    }
     tlsclient.write_all(request_str.as_bytes()).unwrap();
 
     loop {
@@ -81,7 +122,10 @@ pub fn from_https(request: &Request, mut client: &mut TcpStream, mut out: &mut W
 }
 
 
-pub fn http_query(request: &Request, mut out: &mut Write) -> CabotResult<()> {
+pub fn http_query(request: &Request,
+                  mut out: &mut Write,
+                  verbose: bool)
+                  -> CabotResult<()> {
     debug!("{} {}", request.http_method(), request.request_uri());
 
     let resolver = Resolver::new();
@@ -94,8 +138,8 @@ pub fn http_query(request: &Request, mut out: &mut Write) -> CabotResult<()> {
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
     let response = match request.scheme() {
-        "http" => from_http(request, &mut client, &mut out)?,
-        "https" => from_https(request, &mut client, &mut out)?,
+        "http" => from_http(request, &mut client, &mut out, verbose)?,
+        "https" => from_https(request, &mut client, &mut out, verbose)?,
         _ => {
             return Err(CabotError::SchemeError(format!("Unrecognized scheme {}", request.scheme())))
         }

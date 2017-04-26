@@ -34,29 +34,31 @@ pub fn run() -> CabotResult<()> {
             .short("o")
             .long("output")
             .takes_value(true)
-            .multiple(true)
             .help("Write to FILE instead of stdout"))
+        .arg(Arg::with_name("VERBOSE")
+            .short("v")
+            .long("verbose")
+            .help("Make the operation more talkative"))
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
+    let verbose = matches.is_present("VERBOSE");
 
     let headers: Vec<&str> = match matches.values_of("LINE") {
         Some(headers) => headers.collect(),
-        None =>  Vec::new(),
+        None => Vec::new(),
     };
 
-    let request = RequestBuilder::new(url)
-        .set_http_method(http_method)
+    let request = RequestBuilder::new(url).set_http_method(http_method)
         .add_headers(&headers.as_slice())
         .build()?;
 
     if let Some(path) = matches.value_of("FILE") {
         let mut f = File::create(path).unwrap();
-        http::http_query(&request, &mut f)?;
-    }
-    else {
-        http::http_query(&request, &mut io::stdout())?;
+        http::http_query(&request, &mut f, verbose)?;
+    } else {
+        http::http_query(&request, &mut io::stdout(), verbose)?;
     };
 
     Ok(())

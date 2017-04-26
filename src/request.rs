@@ -303,8 +303,7 @@ mod tests {
         assert_eq!(request.headers,
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string(),
-                        ]);
+                        "Accept-Language: fr".to_string()]);
 
         let builder = builder.set_url("http://[::1]/path");
         let request = builder.build().unwrap();
@@ -317,8 +316,7 @@ mod tests {
         assert_eq!(request.headers,
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string(),
-                        ]);
+                        "Accept-Language: fr".to_string()]);
 
         let builder = builder.set_url("not_an_url");
         let err = builder.build();
