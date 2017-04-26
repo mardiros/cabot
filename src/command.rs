@@ -10,9 +10,12 @@ use super::results::{CabotResult, CabotError};
 use super::http;
 use super::request::RequestBuilder;
 
+const version: &'static str = "0.1.0";
+
+
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
-        .version("0.1.0")
+        .version(version)
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
         .about("http(s) client")
         .arg(Arg::with_name("URL")
