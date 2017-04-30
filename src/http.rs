@@ -14,6 +14,9 @@ use super::results::{CabotResult, CabotError};
 use super::dns::Resolver;
 
 fn log_request(request: &str, verbose: bool) {
+    if !log_enabled!(Info) && !verbose {
+        return
+    }
     let mut split = request.split("\r\n");
     if log_enabled!(Info) {
         for part in split {
@@ -28,6 +31,9 @@ fn log_request(request: &str, verbose: bool) {
 }
 
 fn log_response(response: &str, length: usize, verbose: bool) {
+    if !log_enabled!(Info) && !verbose {
+        return
+    }
     let mut split = response.split("\n");
     if log_enabled!(Info) {
         for part in split {
@@ -185,11 +191,9 @@ pub fn http_query(request: &Request,
                   -> CabotResult<()> {
     debug!("HTTP Query {} {}", request.http_method(), request.request_uri());
 
-    let resolver = Resolver::new();
+    let resolver = Resolver::new(verbose);
     let authority = request.authority();
-    info!("DNS Lookup {}", authority);
     let addr = resolver.get_addr(authority);
-    debug!("Host {} has been resolved to {}", authority, addr);
 
     info!("Connecting to {}", addr);
     let mut client = TcpStream::connect(addr).unwrap();
