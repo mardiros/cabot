@@ -3,6 +3,16 @@ name = "cabot"
 version = "0.1.0"
 authors = ["Guillaume Gauvrit <guillaume@gauvr.it>"]
 
+
+[lib]
+name = "cabot"
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "cabot"
+path = "src/bin.rs"
+
 [dependencies]
 
 clap = "^2.21.1"

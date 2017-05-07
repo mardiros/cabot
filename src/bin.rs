@@ -1,21 +1,28 @@
+#[macro_use]
+extern crate log;
+
+extern crate pretty_env_logger;
+
+extern crate clap;
+extern crate cabot;
+
 use std::io;
 use std::io::Write;
-use std::io::prelude::*;
 use std::fs::File;
 
 use clap::{App, Arg};
-use url::Url;
 
-use super::results::{CabotResult, CabotError};
-use super::http;
-use super::request::RequestBuilder;
+use cabot::results::{CabotResult, CabotError};
+use cabot::http;
+use cabot::request::RequestBuilder;
 
-const version: &'static str = "0.1.0";
+
+const VERSION: &'static str = "0.1.0";
 
 
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
-        .version(version)
+        .version(VERSION)
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
         .about("http(s) client")
         .arg(Arg::with_name("URL")
@@ -65,4 +72,36 @@ pub fn run() -> CabotResult<()> {
     };
 
     Ok(())
+}
+
+
+
+fn main() {
+    pretty_env_logger::init().unwrap();
+    debug!("Starting cabot");
+    match run() {
+        Ok(()) => {
+            debug!("Command cabot ended succesfully");
+        }
+        Err(CabotError::SchemeError(scheme)) => {
+            let _ = writeln!(&mut std::io::stderr(), "Unamanaged scheme: {}", scheme);
+            std::process::exit(1);
+        }
+        Err(CabotError::OpaqueUrlError(err)) => {
+            let _ = writeln!(&mut std::io::stderr(), "Opaque URL Error:{}", err);
+            std::process::exit(1);
+        }
+        Err(CabotError::UrlParseError(err)) => {
+            let _ = writeln!(&mut std::io::stderr(), "URL Parse Error:{}", err);
+            std::process::exit(1);
+        }
+        Err(CabotError::IOError(err)) => {
+            let _ = writeln!(&mut std::io::stderr(), "IOError:{}", err);
+            std::process::exit(1);
+        }
+        Err(CabotError::CertificateError(err)) => {
+            let _ = writeln!(&mut std::io::stderr(), "CertificateError: {}", err);
+            std::process::exit(1);
+        }        
+    }
 }
