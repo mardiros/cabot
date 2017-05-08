@@ -8,7 +8,8 @@ extern crate cabot;
 
 use std::io;
 use std::io::Write;
-use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 
 use clap::{App, Arg};
 
@@ -65,7 +66,11 @@ pub fn run() -> CabotResult<()> {
         .build()?;
 
     if let Some(path) = matches.value_of("FILE") {
-        let mut f = File::create(path).unwrap();
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path).unwrap();
         http::http_query(&request, &mut f, verbose)?;
     } else {
         http::http_query(&request, &mut io::stdout(), verbose)?;
