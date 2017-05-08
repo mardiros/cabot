@@ -2,11 +2,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::io::{self, Write, stderr};
 use std::io::prelude::*;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 
 use rustls::{Session, ClientConfig, ClientSession, ProtocolVersion};
 use webpki_roots;
-use url::Url;
 use log::LogLevel::Info;
 
 use super::request::Request;
@@ -17,7 +16,7 @@ fn log_request(request: &str, verbose: bool) {
     if !log_enabled!(Info) && !verbose {
         return
     }
-    let mut split = request.split("\r\n");
+    let split = request.split("\r\n");
     if log_enabled!(Info) {
         for part in split {
             info!("> {}", part);
@@ -28,38 +27,6 @@ fn log_request(request: &str, verbose: bool) {
             writeln!(&mut stderr(), "> {}", part).unwrap();
         }
     }
-}
-
-fn log_response(response: &str, length: usize, verbose: bool) {
-    if !log_enabled!(Info) && !verbose {
-        return
-    }
-    let mut split = response.split("\n");
-    if log_enabled!(Info) {
-        for part in split {
-            info!("< {}", part);
-        }
-        info!("[[{} bytes data]]", length);
-    }
-    else if verbose {
-        for part in split {
-            writeln!(&mut stderr(), "< {}", part).unwrap();
-        }
-        writeln!(&mut stderr(), "< {}", length).unwrap();
-    }
-}
-
-
-fn write_response(mut out: &mut Write,
-                  response: String,
-                  verbose: bool) {
-    let mut response: Vec<&str> = response.splitn(2, "\r\n\r\n").collect();
-    if response.len() == 2 {
-        log_response(response.get(0).unwrap(),
-                     response.get(1).unwrap().len(),
-                     verbose);
-    }
-    out.write_all(response.get(1).unwrap().as_bytes());
 }
 
 
@@ -75,9 +42,9 @@ pub fn from_http(request: &Request,
     debug!("Sending request {}", request_str);
     client.write(request_str.as_bytes()).unwrap();
 
-    let mut response = String::new();
-    client.read_to_string(&mut response).unwrap();
-    write_response(out, response, verbose);
+    let mut response:Vec<u8> = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    out.write_all(response.as_slice()).unwrap();
     Ok(())
 }
 
@@ -94,7 +61,7 @@ pub fn from_https(request: &Request,
     let rc_config = Arc::new(config);
     let mut tlsclient = ClientSession::new(&rc_config, request.host());
     let mut is_handshaking = true;
-    let mut response = String::new();
+    let mut response: Vec<u8> = Vec::new();
     loop {
         while tlsclient.wants_write() {
             let count = tlsclient.write_tls(&mut client).unwrap();
@@ -156,10 +123,7 @@ pub fn from_https(request: &Request,
             let mut part: Vec<u8> = Vec::new();
             let clearcount = tlsclient.read_to_end(&mut part);
             if let Err(err) = clearcount {
-                let spart = unsafe {
-                    String::from_utf8_unchecked(part)
-                };
-                response.push_str(spart.as_str());
+                response.append(&mut part);
 
                 if err.kind() == io::ErrorKind::ConnectionAborted {
                     break;
@@ -170,17 +134,14 @@ pub fn from_https(request: &Request,
                 let clearcount = clearcount.unwrap();
                 debug!("Read {} clear bytes", clearcount);
                 if clearcount > 0 {
-                    let spart = unsafe {
-                        String::from_utf8_unchecked(part)
-                    };
-                    response.push_str(spart.as_str());
+                    response.append(&mut part);
                 }
             }
         } else {
             break;
         }
     }
-    write_response(out, response, verbose);
+    out.write_all(response.as_slice()).unwrap();
     Ok(())
 }
 
@@ -199,7 +160,7 @@ pub fn http_query(request: &Request,
     let mut client = TcpStream::connect(addr).unwrap();
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
-    let response = match request.scheme() {
+    match request.scheme() {
         "http" => from_http(request, &mut client, &mut out, verbose)?,
         "https" => from_https(request, &mut client, &mut out, verbose)?,
         _ => {

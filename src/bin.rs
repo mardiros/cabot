@@ -6,17 +6,17 @@ extern crate pretty_env_logger;
 extern crate clap;
 extern crate cabot;
 
-use std::io;
-use std::io::Write;
+use std::fmt::Arguments;
 use std::fs::OpenOptions;
-use std::io::prelude::*;
+use std::io::{self, Write, stderr};
+
+use log::LogLevel::Info;
 
 use clap::{App, Arg};
 
 use cabot::results::{CabotResult, CabotError};
 use cabot::http;
 use cabot::request::RequestBuilder;
-
 
 const VERSION: &'static str = "0.1.0";
 
@@ -71,9 +71,9 @@ pub fn run() -> CabotResult<()> {
             .create(true)
             .truncate(true)
             .open(path).unwrap();
-        http::http_query(&request, &mut f, verbose)?;
+        http::http_query(&request, &mut OutWrite::new(&mut f, verbose), verbose)?;
     } else {
-        http::http_query(&request, &mut io::stdout(), verbose)?;
+        http::http_query(&request, &mut OutWrite::new(&mut io::stdout(), verbose), verbose)?;
     };
 
     Ok(())
@@ -93,15 +93,15 @@ fn main() {
             std::process::exit(1);
         }
         Err(CabotError::OpaqueUrlError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Opaque URL Error:{}", err);
+            let _ = writeln!(&mut std::io::stderr(), "Opaque URL Error: {}", err);
             std::process::exit(1);
         }
         Err(CabotError::UrlParseError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "URL Parse Error:{}", err);
+            let _ = writeln!(&mut std::io::stderr(), "URL Parse Error: {}", err);
             std::process::exit(1);
         }
         Err(CabotError::IOError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "IOError:{}", err);
+            let _ = writeln!(&mut std::io::stderr(), "IOError: {}", err);
             std::process::exit(1);
         }
         Err(CabotError::CertificateError(err)) => {
@@ -109,4 +109,78 @@ fn main() {
             std::process::exit(1);
         }        
     }
+}
+
+
+// Internal Of the Binary
+
+
+struct CabotBinWrite<'a> {
+    out: &'a mut Write,
+    verbose: bool,
+}
+
+impl<'a> CabotBinWrite<'a> {
+    pub fn new(out: &'a mut Write, verbose: bool) -> Self {
+        CabotBinWrite{ out: out, verbose: verbose}
+    }
+}
+
+
+impl<'a> Write for CabotBinWrite<'a> {
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+
+
+        let response = String::from_utf8_lossy(buf);
+        let response: Vec<&str> = response.splitn(2, "\r\n\r\n").collect();
+
+        // If there is headers and we logged them
+        if response.len() == 2 && (log_enabled!(Info) || self.verbose) {
+            let headers = response.get(0).unwrap();
+            let split = headers.split("\n");
+            if log_enabled!(Info) {
+                for part in split {
+                    info!("< {}", part);
+                }
+            }
+            else if self.verbose {
+                for part in split {
+                    writeln!(&mut stderr(), "< {}", part).unwrap();
+                }
+            }
+        }
+
+        let body = if response.len() == 2 {
+            response.get(1).unwrap()
+        } else {
+            response.get(0).unwrap()
+        };
+
+        if log_enabled!(Info) {
+            info!("< [[{} bytes]]", body.len());
+        }
+        else if self.verbose {
+            writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
+        }
+
+        self.out.write_all(body.as_bytes()).unwrap();
+        Ok(())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        stderr().flush()
+    }
+
+    // Don't implemented unused method
+
+    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    }
+
+
+    fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    }
+
 }
