@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use super::results::{CabotResult, CabotError};
 
 
+#[derive(Debug)]
 pub struct Response {
     status_code: usize,
     status_line: String,
@@ -128,4 +129,60 @@ impl ResponseBuilder {
                          self.headers.to_owned(),
                          self.body.to_owned()))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_response_ok() {
+        let response = Response::new(
+            200,
+            "200 Ok".to_owned(),
+            vec!["Content-Type: application/json".to_owned()],
+            Some(vec![123, 125]));
+
+        assert_eq!(response.status_code(), 200);
+        assert_eq!(response.status_line(), "200 Ok");
+        assert_eq!(response.headers(), &["Content-Type: application/json"]);
+        let body: &[u8] = &[123, 125];
+        assert_eq!(response.body(), Some(body));
+        assert_eq!(response.body_as_string().unwrap(), "{}");
+    }
+
+    #[test]
+    fn test_response_ok_no_body() {
+        let response = Response::new(
+            204,
+            "204 No Content".to_owned(),
+            vec![],
+            None);
+
+        assert_eq!(response.status_code(), 204);
+        assert_eq!(response.status_line(), "204 No Content");
+        let headers: &[&str] = &[];
+        assert_eq!(response.headers(), headers);
+        assert_eq!(response.body(), None);
+        assert_eq!(response.body_as_string().unwrap(), "".to_string());
+    }
+
+    #[test]
+    fn test_build_response_ok() {
+        let response = ResponseBuilder::new()
+            .set_status_line("HTTP/1.1 200 Ok")
+            .add_header("Content-Type: application/json")
+            .set_body(&[123, 125])
+            .build()
+            .unwrap();
+
+        assert_eq!(response.status_code(), 200);
+        assert_eq!(response.status_line(), "200 Ok");
+        assert_eq!(response.headers(), &["Content-Type: application/json"]);
+        let body: &[u8] = &[123, 125];
+        assert_eq!(response.body(), Some(body));
+        assert_eq!(response.body_as_string().unwrap(), "{}");
+    }
+
+
 }
