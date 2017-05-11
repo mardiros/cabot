@@ -5,6 +5,7 @@ use super::results::{CabotResult, CabotError};
 
 #[derive(Debug)]
 pub struct Response {
+    http_version: String,
     status_code: usize,
     status_line: String,
     headers: Vec<String>,
@@ -13,17 +14,23 @@ pub struct Response {
 
 
 impl Response {
-    fn new(status_code: usize,
+    fn new(http_version:String,
+           status_code: usize,
            status_line: String,
            headers: Vec<String>,
            body: Option<Vec<u8>>)
            -> Response {
         Response {
+            http_version: http_version,
             status_code: status_code,
             status_line: status_line,
             headers: headers,
             body: body,
         }
+    }
+
+    pub fn http_version(&self) -> &str {
+        self.http_version.as_str()
     }
 
     pub fn status_code(&self) -> usize {
@@ -124,7 +131,8 @@ impl ResponseBuilder {
         let status_code = status_code.unwrap();
         let status_line = vec_status_line.as_slice().join(" ");
 
-        Ok(Response::new(status_code,
+        Ok(Response::new(http_version.to_owned(),
+                         status_code,
                          status_line,
                          self.headers.to_owned(),
                          self.body.to_owned()))
@@ -138,11 +146,13 @@ mod tests {
     #[test]
     fn test_response_ok() {
         let response = Response::new(
+            "HTTP/1.1".to_owned(),
             200,
             "200 Ok".to_owned(),
             vec!["Content-Type: application/json".to_owned()],
             Some(vec![123, 125]));
 
+        assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
         assert_eq!(response.status_line(), "200 Ok");
         assert_eq!(response.headers(), &["Content-Type: application/json"]);
@@ -154,11 +164,13 @@ mod tests {
     #[test]
     fn test_response_ok_no_body() {
         let response = Response::new(
+            "HTTP/1.1".to_owned(),
             204,
             "204 No Content".to_owned(),
             vec![],
             None);
 
+        assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 204);
         assert_eq!(response.status_line(), "204 No Content");
         let headers: &[&str] = &[];
@@ -176,6 +188,7 @@ mod tests {
             .build()
             .unwrap();
 
+        assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
         assert_eq!(response.status_line(), "200 Ok");
         assert_eq!(response.headers(), &["Content-Type: application/json"]);
