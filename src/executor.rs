@@ -46,7 +46,7 @@ impl Write for CabotLibWrite {
 
 
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        info!("Parsing response");
+        info!("Parsing http response");
         let mut response = Vec::with_capacity(buf.len());
         response.extend_from_slice(buf);
         let response = unsafe { String::from_utf8_unchecked(response) };
@@ -55,17 +55,23 @@ impl Write for CabotLibWrite {
         let mut headers: Vec<&str> = response.get(0).unwrap().split("\r\n").collect();
         let mut builder = ResponseBuilder::new();
         let status_line = headers.remove(0);
-        info!("Adding status line {}", status_line);
+        debug!("Adding status line {}", status_line);
         builder = builder.set_status_line(status_line);
         for header in  headers.iter() {
-            info!("Adding header {}", header);
+            debug!("Adding header {}", header);
             builder = builder.add_header(header);
         }
-        let body = &buf[(header_len + 4)..buf.len()]; 
+
+        let body = if (header_len + 4) < buf.len() {
+            &buf[(header_len + 4)..buf.len()]
+        }
+        else {
+            &buf[..]
+        }; 
         //debug!("Adding body {:?}", body);
         builder = builder.set_body(body);
         self.response_builder = builder;
-        debug!("Response Builder - {:?}", self.response_builder);
+        // debug!("Response Builder - {:?}", self.response_builder);
         Ok(())
     }
 
@@ -84,4 +90,31 @@ impl Write for CabotLibWrite {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
 
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_http_response_from_string() {
+        let response = vec!["HTTP/1.1 200 Ok",
+                            "Content-Type: text/plain",
+                            "Content-Length: 12",
+                            "",
+                            "Hello World!"];
+        let response = response.join("\r\n");
+
+        let mut out = CabotLibWrite::new();
+        out.write_all(response.as_bytes()).unwrap();
+        let response = out.response().unwrap();
+        assert_eq!(response.http_version(), "HTTP/1.1");
+        assert_eq!(response.status_code(), 200);
+        assert_eq!(response.status_line(), "200 Ok");
+        let headers: &[&str] = &["Content-Type: text/plain", "Content-Length: 12"];
+        assert_eq!(response.headers(), headers);
+        assert_eq!(response.body_as_string().unwrap(), "Hello World!".to_owned());
+
+    }
+
+}
