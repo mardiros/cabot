@@ -71,9 +71,9 @@ pub fn run() -> CabotResult<()> {
             .create(true)
             .truncate(true)
             .open(path).unwrap();
-        http::http_query(&request, &mut OutWrite::new(&mut f, verbose), verbose)?;
+        http::http_query(&request, &mut CabotBinWrite::new(&mut f, verbose), verbose)?;
     } else {
-        http::http_query(&request, &mut OutWrite::new(&mut io::stdout(), verbose), verbose)?;
+        http::http_query(&request, &mut CabotBinWrite::new(&mut io::stdout(), verbose), verbose)?;
     };
 
     Ok(())
@@ -108,6 +108,15 @@ fn main() {
             let _ = writeln!(&mut std::io::stderr(), "CertificateError: {}", err);
             std::process::exit(1);
         }        
+        // Unexpexcted Error, not used
+        Err(CabotError::HttpResponseParseError(_)) => {
+            let _ = writeln!(&mut std::io::stderr(), "Unexpected error");
+            std::process::exit(1);
+        }
+        Err(CabotError::EncodingError(_)) => {
+            let _ = writeln!(&mut std::io::stderr(), "Unexpected error");
+            std::process::exit(1);
+        }
     }
 }
 

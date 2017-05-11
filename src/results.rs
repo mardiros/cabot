@@ -8,6 +8,8 @@ pub enum CabotError {
     SchemeError(String),
     OpaqueUrlError(String),
     UrlParseError(url::ParseError),
+    HttpResponseParseError(String),
+    EncodingError(String),
 }
 
 pub type CabotResult<T> = Result<T, CabotError>;

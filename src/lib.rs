@@ -5,7 +5,10 @@ extern crate url;
 extern crate rustls;
 extern crate webpki_roots;
 
-pub mod results;
-pub mod dns;
+mod dns;
 pub mod http;
+
+pub mod results;
 pub mod request;
+pub mod executor;
+mod response;
