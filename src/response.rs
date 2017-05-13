@@ -1,8 +1,30 @@
+//! HTTP Response handling.
+//! The TCP response stream is converted to a
+//! [Response](../response/struct.Response.html) structure.
+//! 
+//! # Example
+//! ```
+//! use cabot::response::ResponseBuilder;
+//!
+//! let response = ResponseBuilder::new()
+//!     .set_status_line("HTTP/1.1 200 Ok")
+//!     .add_header("Content-Type: application/json")
+//!     .set_body(&[123, 125])
+//!     .build()
+//!     .unwrap();
+//!
+//! assert_eq!(response.http_version(), "HTTP/1.1");
+//! assert_eq!(response.status_code(), 200);
+//! assert_eq!(response.status_line(), "200 Ok");
+//! assert_eq!(response.headers(), &["Content-Type: application/json"]);
+//! assert_eq!(response.body_as_string().unwrap(), "{}");
+//! ```
+
 use std::num::ParseIntError;
 
 use super::results::{CabotResult, CabotError};
 
-
+/// Represent the parsed HTTP response.
 #[derive(Debug)]
 pub struct Response {
     http_version: String,
@@ -29,23 +51,28 @@ impl Response {
         }
     }
 
+    /// The response http version such as `HTTP/1.1`
     pub fn http_version(&self) -> &str {
         self.http_version.as_str()
     }
 
+    /// The status status code such as `200`
     pub fn status_code(&self) -> usize {
         self.status_code
     }
 
+    /// The status line such as `200 Ok`
     pub fn status_line(&self) -> &str {
         self.status_line.as_str()
     }
 
+    /// Response headers
     pub fn headers(&self) -> Vec<&str> {
         let headers: Vec<&str> = self.headers.iter().map(|s| s.as_ref()).collect();
         headers
     }
 
+    /// Get the body as raw format.
     pub fn body(&self) -> Option<&[u8]> {
         match self.body {
             None => None,
@@ -54,7 +81,15 @@ impl Response {
             }
         }
     }
-    
+
+    /// Clone the body and retrieve it in a String object.
+    ///
+    /// Important: Currently assume the body is encoded in utf-8.
+    ///
+    /// Errors:
+    ///
+    ///  - CabotError::EncodingError in case the body is not an utf-8 string
+    ///
     pub fn body_as_string(&self) -> CabotResult<String> {
         let body = match self.body {
             None => "".to_owned(),
@@ -74,6 +109,9 @@ impl Response {
 
 
 #[derive(Debug)]
+/// An internal class used to build response.
+///
+///
 pub struct ResponseBuilder {
     status_line: Option<String>,
     headers: Vec<String>,
@@ -81,6 +119,8 @@ pub struct ResponseBuilder {
 }
 
 impl ResponseBuilder {
+
+    /// Construct a ResponseBuilder
     pub fn new() -> Self {
         ResponseBuilder {
             status_line: None,
@@ -89,16 +129,19 @@ impl ResponseBuilder {
         }
     }
 
+    /// initialize the status line
     pub fn set_status_line(mut self, status_line: &str) -> Self {
         self.status_line = Some(status_line.to_string());
         self
     }
 
+    /// Append an header
     pub fn add_header(mut self, header: &str) -> Self {
         self.headers.push(header.to_owned());
         self
     }
 
+    /// Set a response body
     pub fn set_body(mut self, buf: &[u8]) -> Self {
         let mut body = Vec::with_capacity(buf.len()); 
         body.extend_from_slice(buf);
@@ -106,6 +149,7 @@ impl ResponseBuilder {
         self
     }
 
+    /// Build the Response with the initialized data.
     pub fn build(&self) -> CabotResult<Response> {
         if self.status_line.is_none() {
             return Err(CabotError::HttpResponseParseError("No Status Line".to_owned()));

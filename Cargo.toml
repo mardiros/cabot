@@ -2,6 +2,14 @@
 name = "cabot"
 version = "0.1.0"
 authors = ["Guillaume Gauvrit <guillaume@gauvr.it>"]
+readme = "README.md"
+keywords = ["http", "https", "request", "client"]
+categories = ["web-programming::http-client", "command-line-interface"]
+description = """Simple HTTP Client."""
+license = "BSD-3-Clause"
+documentation = "https://docs.rs/crate/cabot"
+#homepage = "https://github.com/mardiros/cabot"
+repository = "https://github.com/mardiros/cabot"
 
 
 [lib]
@@ -12,6 +20,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "cabot"
 path = "src/bin.rs"
+doc = false
 
 [dependencies]
 

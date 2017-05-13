@@ -1,3 +1,5 @@
+//! DNS Resolution
+
 use std::io::{Write, stderr};
 use std::net::{ToSocketAddrs, SocketAddr};
 use log::LogLevel::Info;

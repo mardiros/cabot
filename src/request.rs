@@ -1,8 +1,30 @@
+//! HTTP Request handling.
+//!
+//! # Example
+//! ```
+//! use cabot::RequestBuilder;
+//!
+//! let request = RequestBuilder::new("http://localhost/")
+//!     .set_http_method("POST")
+//!     .add_header("Content-Type: application/json")
+//!     .set_body("{}")
+//!     .build()
+//!     .unwrap();
+//!     let attempt = "POST / HTTP/1.1\r\nContent-Type: \
+//!                    application/json\r\nHost: localhost\r\nConnection: \
+//!                    close\r\nContent-Length: 2\r\n\r\n{}";
+//! assert_eq!(request.to_string(), attempt.to_string());
+//! ```
+
 use url::{self, Url};
 
 use results::{CabotResult, CabotError};
 
-
+/// An HTTP Request representation.
+///
+/// Request is build using [RequestBuilder](../request/struct.RequestBuilder.html)
+/// and them consume by the [RequestExecutor](../executor/struct.RequestExecutor.html)
+/// to perform the query.
 pub struct Request {
     host: String,
     port: u16,
@@ -41,40 +63,52 @@ impl Request {
             body: body,
         }
     }
+
+    /// The HTTP verb used to perform the request,
+    /// such as GET, POST, ...
     pub fn http_method(&self) -> &str {
         self.http_method.as_str()
     }
 
+    /// The HTTP Body of the request.
     pub fn body(&self) -> Option<&str> {
         match self.body {
             Some(ref payload) => Some(payload.as_str()),
             None => None,
         }
     }
+
+    /// The Version of the HTTP to perform the request.
     pub fn http_version(&self) -> &str {
         self.http_version.as_str()
     }
 
+    /// The server name to connect. can be a name to resolve or an IP address.
     pub fn host(&self) -> &str {
         self.host.as_str()
     }
 
+    /// The TCP server port to connect.
     pub fn port(&self) -> u16 {
         self.port
     }
 
+    /// The authority part of the url (`host`:`port`).
     pub fn authority(&self) -> &str {
         self.authority.as_str()
     }
 
+    /// The protocol scheme, can be http or https.
     pub fn scheme(&self) -> &str {
         self.scheme.as_str()
     }
 
+    /// The URI to send, something like a PATH_INFO and a querystring.
     pub fn request_uri(&self) -> &str {
         self.request_uri.as_str()
     }
 
+    /// The String representation of the query to send to the server.
     pub fn to_string(&self) -> String {
         let mut resp = format!("{} {} {}\r\n",
                                self.http_method(),
@@ -99,7 +133,7 @@ impl Request {
     }
 }
 
-
+/// Construct [Request](../request/struct.Request.html)
 pub struct RequestBuilder {
     http_method: String,
     url: Result<Url, url::ParseError>,
@@ -109,6 +143,12 @@ pub struct RequestBuilder {
 }
 
 impl RequestBuilder {
+    /// Create a new RequestBuilder with the given url.
+    ///
+    /// `url` will be parsed to get the host to contact and the uri to send.
+    /// When building a request object after creating the builder,
+    /// the http method will be `GET` with neither header nor body and
+    /// the http version will be `HTTP/1.1`
     pub fn new(url: &str) -> Self {
         let url = url.parse::<Url>();
         RequestBuilder {
@@ -120,26 +160,32 @@ impl RequestBuilder {
         }
     }
 
+    /// Replace the url in case the RequestBuilder is used many time
+    /// for multiple query.
     pub fn set_url(mut self, url: &str) -> Self {
         self.url = url.parse::<Url>();
         self
     }
 
+    /// Set the http method such as `GET` `POST`. Default value is `GET`.
     pub fn set_http_method(mut self, http_method: &str) -> Self {
         self.http_method = http_method.to_owned();
         self
     }
 
+    /// Set the protocol version to use.. Default value is `HTTP/1.1`.
     pub fn set_http_version(mut self, http_version: &str) -> Self {
         self.http_version = http_version.to_owned();
         self
     }
 
+    /// Add a HTTP header.
     pub fn add_header(mut self, header: &str) -> Self {
         self.headers.push(header.to_owned());
         self
     }
 
+    /// Add many headers.
     pub fn add_headers(mut self, headers: &[&str]) -> Self {
         for header in headers {
             self.headers.push(header.to_string());
@@ -147,11 +193,21 @@ impl RequestBuilder {
         self
     }
 
+    /// Set a body to send in the query. By default a query has no body.
     pub fn set_body(mut self, body: &str) -> Self {
         self.body = Some(body.to_owned());
         self
     }
 
+    /// Construct the [Request](../request/struct.Request.html).
+    /// To perform the query, a [RequestExecutor](../executor/struct.RequestExecutor.html)
+    /// has to be created.
+    ///
+    /// Errors:
+    ///
+    ///   - CabotError::ParseUrlError in case the `url` is not parsable
+    ///   - CabotError::OpaqueUrlError in case the `url` is parsed but miss informations such as hostname.
+    ///
     pub fn build(&self) -> CabotResult<Request> {
         if let Err(ref err) = self.url {
             return Err(CabotError::UrlParseError(err.clone()));

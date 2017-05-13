@@ -1,3 +1,5 @@
+//! Low level and internal http and https implementation.
+
 use std::sync::Arc;
 use std::time::Duration;
 use std::io::{self, Write, stderr};
@@ -29,8 +31,7 @@ fn log_request(request: &str, verbose: bool) {
     }
 }
 
-
-pub fn from_http(request: &Request,
+fn from_http(request: &Request,
                  mut client: &mut TcpStream,
                  mut out: &mut Write,
                  verbose: bool)
@@ -48,7 +49,7 @@ pub fn from_http(request: &Request,
     Ok(())
 }
 
-pub fn from_https(request: &Request,
+fn from_https(request: &Request,
                   mut client: &mut TcpStream,
                   mut out: &mut Write,
                   verbose: bool)

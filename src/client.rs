@@ -1,3 +1,5 @@
+//! The HTTP Client that perform query
+
 use std::io::{self, Write};
 use std::fmt::Arguments;
 
@@ -6,7 +8,7 @@ use super::http;
 use super::response::{Response, ResponseBuilder};
 use super::results::CabotResult;
 
-
+/// Perform the http query
 pub struct RequestExecutor {
     verbose: bool
 }
@@ -14,10 +16,13 @@ pub struct RequestExecutor {
 
 impl RequestExecutor {
 
+    /// Construct a new `RequestExecutor`
     pub fn new() -> Self {
         RequestExecutor{verbose: false}
     }
 
+    /// Execute the query [Request](../request/struct.Request.html) and
+    /// return the associate [Response](../response/struct.Response.html).
     pub fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
         http::http_query(&request, &mut out, self.verbose)?;
