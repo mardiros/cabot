@@ -9,16 +9,16 @@ use super::response::{Response, ResponseBuilder};
 use super::results::CabotResult;
 
 /// Perform the http query
-pub struct RequestExecutor {
+pub struct Client {
     verbose: bool
 }
 
 
-impl RequestExecutor {
+impl Client {
 
-    /// Construct a new `RequestExecutor`
+    /// Construct a new `Client`
     pub fn new() -> Self {
-        RequestExecutor{verbose: false}
+        Client{verbose: false}
     }
 
     /// Execute the query [Request](../request/struct.Request.html) and

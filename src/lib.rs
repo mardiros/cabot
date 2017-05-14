@@ -21,12 +21,12 @@
 //! ## Library:
 //!
 //! ```
-//! use cabot::{RequestBuilder, RequestExecutor};
+//! use cabot::{RequestBuilder, Client};
 //!
 //! let request = RequestBuilder::new("https://www.rust-lang.org/en-US/")
 //!     .build()
 //!     .unwrap();
-//! let client = RequestExecutor::new();
+//! let client = Client::new();
 //! let response = client.execute(&request).unwrap();
 //! assert!(response.body_as_string().unwrap().contains("runs blazingly fast"));
 //!
@@ -53,9 +53,9 @@ pub mod http;
 
 pub mod results;
 pub mod request;
-pub mod executor;
+pub mod client;
 pub mod response;
 
 // Rexport
+pub use client::Client;
 pub use request::RequestBuilder;
-pub use executor::RequestExecutor;

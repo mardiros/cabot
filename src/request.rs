@@ -23,7 +23,7 @@ use results::{CabotResult, CabotError};
 /// An HTTP Request representation.
 ///
 /// Request is build using [RequestBuilder](../request/struct.RequestBuilder.html)
-/// and them consume by the [RequestExecutor](../executor/struct.RequestExecutor.html)
+/// and them consume by the [Client](../client/struct.Client.html)
 /// to perform the query.
 pub struct Request {
     host: String,
@@ -200,7 +200,7 @@ impl RequestBuilder {
     }
 
     /// Construct the [Request](../request/struct.Request.html).
-    /// To perform the query, a [RequestExecutor](../executor/struct.RequestExecutor.html)
+    /// To perform the query, a [Client](../client/struct.Client.html)
     /// has to be created.
     ///
     /// Errors:
