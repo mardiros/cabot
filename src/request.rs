@@ -7,7 +7,7 @@
 //! let request = RequestBuilder::new("http://localhost/")
 //!     .set_http_method("POST")
 //!     .add_header("Content-Type: application/json")
-//!     .set_body("{}")
+//!     .set_body_as_str("{}")
 //!     .build()
 //!     .unwrap();
 //!     let attempt = "POST / HTTP/1.1\r\nContent-Type: \
@@ -35,7 +35,7 @@ pub struct Request {
     request_uri: String,
     http_version: String,
     headers: Vec<String>,
-    body: Option<String>,
+    body: Option<Vec<u8>>,
 }
 
 impl Request {
@@ -48,7 +48,7 @@ impl Request {
            request_uri: String,
            http_version: String,
            headers: Vec<String>,
-           body: Option<String>)
+           body: Option<Vec<u8>>)
            -> Request {
         Request {
             host: host,
@@ -71,11 +71,37 @@ impl Request {
     }
 
     /// The HTTP Body of the request.
-    pub fn body(&self) -> Option<&str> {
+    pub fn body(&self) -> Option<&[u8]> {
         match self.body {
-            Some(ref payload) => Some(payload.as_str()),
             None => None,
+            Some(ref body) => {
+                Some(body.as_slice())
+            }
         }
+    }
+
+    /// Clone the body and retrieve it in a String object.
+    ///
+    /// Important: Currently assume the body is encoded in utf-8.
+    ///
+    /// Errors:
+    ///
+    ///  - CabotError::EncodingError in case the body is not an utf-8 string
+    ///
+    pub fn body_as_string(&self) -> CabotResult<Option<String>> {
+        let body = match self.body {
+            None => return Ok(None),
+            Some(ref body) => {
+                let mut body_vec: Vec<u8> = Vec::new();
+                body_vec.extend_from_slice(body);
+                let body_str = String::from_utf8(body_vec);
+                if body_str.is_err() {
+                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}", body_str.unwrap_err())))
+                }
+                body_str.unwrap()
+            }
+        };
+        Ok(Some(body))
     }
 
     /// The Version of the HTTP to perform the request.
@@ -122,10 +148,10 @@ impl Request {
             resp.push_str(format!("Host: {}\r\n", self.host()).as_str());
         }
         resp.push_str("Connection: close\r\n");
-        if let Some(payload) = self.body() {
+        if let Ok(Some(payload)) = self.body_as_string() {
             resp.push_str(format!("Content-Length: {}\r\n", payload.len()).as_str());
             resp.push_str("\r\n");
-            resp.push_str(payload);
+            resp.push_str(payload.as_str());
         } else {
             resp.push_str("\r\n");
         }
@@ -139,7 +165,7 @@ pub struct RequestBuilder {
     url: Result<Url, url::ParseError>,
     http_version: String,
     headers: Vec<String>,
-    body: Option<String>,
+    body: Option<Vec<u8>>,
 }
 
 impl RequestBuilder {
@@ -193,10 +219,18 @@ impl RequestBuilder {
         self
     }
 
-    /// Set a body to send in the query. By default a query has no body.
-    pub fn set_body(mut self, body: &str) -> Self {
-        self.body = Some(body.to_owned());
+    /// Set a response body
+    pub fn set_body(mut self, buf: &[u8]) -> Self {
+        let mut body = Vec::with_capacity(buf.len());
+        body.extend_from_slice(buf);
+        self.body = Some(body);
         self
+    }
+
+    /// Set a body to send in the query. By default a query has no body.
+    pub fn set_body_as_str(self, body: &str) -> Self {
+        let moved = self.set_body(body.as_bytes());
+        moved
     }
 
     /// Construct the [Request](../request/struct.Request.html).
@@ -310,6 +344,7 @@ mod tests {
 
     #[test]
     fn test_post_request_with_headers_to_string() {
+        let body: Vec<u8> = vec![123, 125];
         let request = Request::new("localhost".to_owned(),
                                    80,
                                    "localhost:80".to_owned(),
@@ -320,7 +355,7 @@ mod tests {
                                    "HTTP/1.1".to_owned(),
                                    vec!["Accept-Language: fr".to_owned(),
                                         "Content-Type: application/json".to_owned()],
-                                   Some("{}".to_owned()));
+                                   Some(body));
         let attempt = "POST / HTTP/1.1\r\nAccept-Language: fr\r\nContent-Type: \
                        application/json\r\nHost: localhost\r\nConnection: \
                        close\r\nContent-Length: 2\r\n\r\n{}";
@@ -348,10 +383,12 @@ mod tests {
             .set_http_version("HTTP/1.0")
             .add_header("Content-Type: application/json")
             .add_headers(&["Accept-Encoding: deflate", "Accept-Language: fr"])
-            .set_body("{}");
+            .set_body_as_str("{}");
+        let body: &[u8] = &[123, 125];
         let request = builder.build().unwrap();
         assert_eq!(request.host(), "localhost".to_string());
-        assert_eq!(request.body, Some("{}".to_string()));
+        assert_eq!(request.body(), Some(body));
+        assert_eq!(request.body_as_string().unwrap().unwrap(), "{}".to_string());
         assert_eq!(request.scheme(), "http".to_string());
         assert_eq!(request.http_method(), "POST".to_string());
         assert_eq!(request.request_uri(), "/");
@@ -365,7 +402,8 @@ mod tests {
         let request = builder.build().unwrap();
         assert_eq!(request.host(), "[::1]".to_string());
         assert_eq!(request.request_uri(), "/path");
-        assert_eq!(request.body, Some("{}".to_string()));
+        assert_eq!(request.body(), Some(body));
+        assert_eq!(request.body_as_string().unwrap().unwrap(), "{}".to_string());
         assert_eq!(request.scheme(), "http".to_string());
         assert_eq!(request.http_method(), "POST".to_string());
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
