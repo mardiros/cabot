@@ -62,11 +62,36 @@ impl Write for CabotLibWrite {
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);
         builder = builder.set_status_line(status_line);
-        for header in  headers.iter() {
-            debug!("Adding header {}", header);
-            builder = builder.add_header(header);
+        let mut iter_header = headers.iter().peekable();
+        let header = iter_header.next();
+        if header.is_some() {
+            let buf = header.unwrap();
+            let mut header = String::with_capacity(buf.len() * 2);
+            header.push_str(buf);
+            loop {
+                {
+                    let buf = iter_header.peek();
+                    if buf.is_none() {
+                        builder = builder.add_header(header.as_str());
+                        break;
+                    }
+                    let buf = buf.unwrap();
+                    if buf.starts_with(" ") || buf.starts_with("\t") {
+                        debug!("Obsolete line folded header reveived in {}",
+                               header);
+                        header.push_str(" ");
+                        header.push_str(buf.trim_left());
+                    }
+                    else {
+                        debug!("Adding header {}", header);
+                        builder = builder.add_header(header.as_str());
+                        header.clear();
+                        header.push_str(buf);
+                    }
+                }
+                let _  = iter_header.next();
+            }
         }
-
         let body = if (header_len + 4) < buf.len() {
             &buf[(header_len + 4)..buf.len()]
         }
@@ -117,6 +142,54 @@ mod tests {
         assert_eq!(response.status_code(), 200);
         assert_eq!(response.status_line(), "200 Ok");
         let headers: &[&str] = &["Content-Type: text/plain", "Content-Length: 12"];
+        assert_eq!(response.headers(), headers);
+        assert_eq!(response.body_as_string().unwrap(), "Hello World!".to_owned());
+
+    }
+
+    #[test]
+    fn test_build_http_header_obsolete_line_folding() {
+        let response = vec!["HTTP/1.1 200 Ok",
+                            "ows: https://tools.ietf.org/html/rfc7230",
+                            "  #section-3.2.4",
+                            "Content-Length: 12",
+                            "",
+                            "Hello World!"];
+        let response = response.join("\r\n");
+
+        let mut out = CabotLibWrite::new();
+        out.write_all(response.as_bytes()).unwrap();
+        let response = out.response().unwrap();
+        assert_eq!(response.http_version(), "HTTP/1.1");
+        assert_eq!(response.status_code(), 200);
+        assert_eq!(response.status_line(), "200 Ok");
+        let headers: &[&str] = &[
+            "ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
+            "Content-Length: 12"];
+        assert_eq!(response.headers(), headers);
+        assert_eq!(response.body_as_string().unwrap(), "Hello World!".to_owned());
+
+    }
+
+    #[test]
+    fn test_build_http_header_obsolete_line_folding_tab() {
+        let response = vec!["HTTP/1.1 200 Ok",
+                            "ows: https://tools.ietf.org/html/rfc7230",
+                            "\t#section-3.2.4",
+                            "Content-Length: 12",
+                            "",
+                            "Hello World!"];
+        let response = response.join("\r\n");
+
+        let mut out = CabotLibWrite::new();
+        out.write_all(response.as_bytes()).unwrap();
+        let response = out.response().unwrap();
+        assert_eq!(response.http_version(), "HTTP/1.1");
+        assert_eq!(response.status_code(), 200);
+        assert_eq!(response.status_line(), "200 Ok");
+        let headers: &[&str] = &[
+            "ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
+            "Content-Length: 12"];
         assert_eq!(response.headers(), headers);
         assert_eq!(response.body_as_string().unwrap(), "Hello World!".to_owned());
 

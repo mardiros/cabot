@@ -51,28 +51,37 @@ impl Response {
         }
     }
 
-    /// The response http version such as `HTTP/1.1`
+    /// The response http version such as `HTTP/1.1` extracted from the
+    /// repsonse status line.
     pub fn http_version(&self) -> &str {
         self.http_version.as_str()
     }
 
-    /// The status status code such as `200`
+    /// The status status code such as `200` extracted from the response status
+    /// line.
     pub fn status_code(&self) -> usize {
         self.status_code
     }
 
-    /// The status line such as `200 Ok`
+    /// The status line such as `200 Ok`. The status line as defined in 
+    /// [rfc7230](https://tools.ietf.org/html/rfc7230#section-3.1.1) also
+    /// contains the http version, but, for convenience, it has been stripped
+    /// here but is available using the `http_version()` method.
     pub fn status_line(&self) -> &str {
         self.status_line.as_str()
     }
 
-    /// Response headers
+    /// Response headers.
+    /// Headers are not key/value parsed here to avoid deduplicates them.
+    /// But multiline headers
+    /// ([obsolete line folding](https://tools.ietf.org/html/rfc7230#section-3.2]))
+    /// are implemented as specified and CRLF separator are preserved.
     pub fn headers(&self) -> Vec<&str> {
         let headers: Vec<&str> = self.headers.iter().map(|s| s.as_ref()).collect();
         headers
     }
 
-    /// Get the body as raw format.
+    /// Get the body in raw format.
     pub fn body(&self) -> Option<&[u8]> {
         match self.body {
             None => None,
