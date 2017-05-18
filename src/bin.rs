@@ -50,20 +50,33 @@ pub fn run() -> CabotResult<()> {
             .short("v")
             .long("verbose")
             .help("Make the operation more talkative"))
+        .arg(Arg::with_name("BODY")
+            .short("d")
+            .long("data")
+            .takes_value(true)
+            .help("Post Data (Using utf-8 encoding)"))
+
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
     let verbose = matches.is_present("VERBOSE");
+    let body = matches.value_of("BODY");
 
     let headers: Vec<&str> = match matches.values_of("LINE") {
         Some(headers) => headers.collect(),
         None => Vec::new(),
     };
 
-    let request = RequestBuilder::new(url).set_http_method(http_method)
-        .add_headers(&headers.as_slice())
-        .build()?;
+    let mut builder = RequestBuilder::new(url)
+        .set_http_method(http_method)
+        .add_headers(&headers.as_slice());
+
+    if body.is_some() {
+        builder = builder.set_body_as_str(body.unwrap());
+    }
+
+    let request = builder.build()?;
 
     if let Some(path) = matches.value_of("FILE") {
         let mut f = OpenOptions::new()
