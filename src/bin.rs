@@ -26,30 +26,36 @@ pub fn run() -> CabotResult<()> {
         .version(VERSION)
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
         .about("http(s) client")
+
         .arg(Arg::with_name("URL")
             .index(1)
             .required(true)
             .help("URL to request"))
+
         .arg(Arg::with_name("REQUEST")
             .short("X")
             .long("request")
             .default_value("GET")
             .help("Specify request command to use"))
-        .arg(Arg::with_name("LINE")
+
+        .arg(Arg::with_name("HEADER")
             .short("H")
             .long("header")
             .takes_value(true)
             .multiple(true)
-            .help("Pass custom header LINE to server"))
+            .help("Pass custom header to server"))
+
         .arg(Arg::with_name("FILE")
             .short("o")
             .long("output")
             .takes_value(true)
             .help("Write to FILE instead of stdout"))
+
         .arg(Arg::with_name("VERBOSE")
             .short("v")
             .long("verbose")
             .help("Make the operation more talkative"))
+
         .arg(Arg::with_name("BODY")
             .short("d")
             .long("data")
@@ -63,7 +69,7 @@ pub fn run() -> CabotResult<()> {
     let verbose = matches.is_present("VERBOSE");
     let body = matches.value_of("BODY");
 
-    let headers: Vec<&str> = match matches.values_of("LINE") {
+    let headers: Vec<&str> = match matches.values_of("HEADER") {
         Some(headers) => headers.collect(),
         None => Vec::new(),
     };
