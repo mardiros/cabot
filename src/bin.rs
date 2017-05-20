@@ -18,12 +18,12 @@ use cabot::results::{CabotResult, CabotError};
 use cabot::http;
 use cabot::request::RequestBuilder;
 
-const VERSION: &'static str = "0.1.0";
+mod constants;
 
 
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
-        .version(VERSION)
+        .version(constants::VERSION)
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
         .about("http(s) client")
 
@@ -62,12 +62,19 @@ pub fn run() -> CabotResult<()> {
             .takes_value(true)
             .help("Post Data (Using utf-8 encoding)"))
 
+        .arg(Arg::with_name("UA")
+            .short("A")
+            .long("user-agent")
+            .default_value(constants::USER_AGENT)
+            .help("Post Data (Using utf-8 encoding)"))
+
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
     let verbose = matches.is_present("VERBOSE");
     let body = matches.value_of("BODY");
+    let ua = matches.value_of("UA").unwrap();
 
     let headers: Vec<&str> = match matches.values_of("HEADER") {
         Some(headers) => headers.collect(),
@@ -76,6 +83,7 @@ pub fn run() -> CabotResult<()> {
 
     let mut builder = RequestBuilder::new(url)
         .set_http_method(http_method)
+        .set_user_agent(ua)
         .add_headers(&headers.as_slice());
 
     if body.is_some() {

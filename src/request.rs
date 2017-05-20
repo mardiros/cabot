@@ -11,14 +11,16 @@
 //!     .build()
 //!     .unwrap();
 //!     let attempt = "POST / HTTP/1.1\r\nContent-Type: \
-//!                    application/json\r\nHost: localhost\r\nConnection: \
+//!                    application/json\r\nUser-Agent: cabot/0.1.0\r\n\
+//!                    Host: localhost\r\nConnection: \
 //!                    close\r\nContent-Length: 2\r\n\r\n{}";
 //! assert_eq!(request.to_string(), attempt.to_string());
 //! ```
 
 use url::{self, Url};
 
-use results::{CabotResult, CabotError};
+use super::results::{CabotResult, CabotError};
+use super::constants;
 
 /// An HTTP Request representation.
 ///
@@ -162,6 +164,7 @@ impl Request {
 /// Construct [Request](../request/struct.Request.html)
 pub struct RequestBuilder {
     http_method: String,
+    user_agent: String,
     url: Result<Url, url::ParseError>,
     http_version: String,
     headers: Vec<String>,
@@ -179,6 +182,7 @@ impl RequestBuilder {
         let url = url.parse::<Url>();
         RequestBuilder {
             http_method: "GET".to_owned(),
+            user_agent: constants::USER_AGENT.to_string(),
             url: url,
             http_version: "HTTP/1.1".to_owned(),
             headers: Vec::new(),
@@ -219,7 +223,18 @@ impl RequestBuilder {
         self
     }
 
-    /// Set a response body
+    /// Override the [default user-agent](../constants/index.html)
+    ///
+    /// Important: don't add a user_agent usering the `add_header` function
+    ///            to avoid a duplicate header `User-Agent`
+    pub fn set_user_agent(mut self, user_agent: &str) -> Self {
+        self.user_agent = user_agent.to_owned();
+        self
+    }
+
+    /// Set a response body.
+    ///
+    /// If a body is set, the `Content-Length` headers is added by cabot.
     pub fn set_body(mut self, buf: &[u8]) -> Self {
         let mut body = Vec::with_capacity(buf.len());
         body.extend_from_slice(buf);
@@ -271,6 +286,9 @@ impl RequestBuilder {
             is_domain = false;
         }
 
+        let mut headers = self.headers.clone();
+        headers.push(format!("User-Agent: {}", self.user_agent));
+
         Ok(Request::new(host.to_owned(),
                         port,
                         format!("{}:{}", host, port),
@@ -279,7 +297,7 @@ impl RequestBuilder {
                         self.http_method.clone(),
                         request_uri,
                         self.http_version.clone(),
-                        self.headers.clone(),
+                        headers,
                         match self.body {
                             Some(ref body) => Some(body.clone()),
                             None => None,
@@ -291,6 +309,7 @@ impl RequestBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::constants;
 
     #[test]
     fn test_get_request_to_string() {
@@ -372,7 +391,7 @@ mod tests {
         assert_eq!(request.body, None);
         assert_eq!(request.http_method(), "GET".to_string());
         assert_eq!(request.http_version(), "HTTP/1.1".to_string());
-        let headers: Vec<String> = Vec::new();
+        let headers: Vec<String> = vec![format!("User-Agent: {}", constants::USER_AGENT)];
         assert_eq!(request.headers, headers);
     }
 
@@ -381,6 +400,7 @@ mod tests {
         let builder = RequestBuilder::new("http://localhost/")
             .set_http_method("POST")
             .set_http_version("HTTP/1.0")
+            .set_user_agent("anonymized")
             .add_header("Content-Type: application/json")
             .add_headers(&["Accept-Encoding: deflate", "Accept-Language: fr"])
             .set_body_as_str("{}");
@@ -396,7 +416,9 @@ mod tests {
         assert_eq!(request.headers,
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string()]);
+                        "Accept-Language: fr".to_string(),
+                        "User-Agent: anonymized".to_string(),
+                        ]);
 
         let builder = builder.set_url("http://[::1]/path");
         let request = builder.build().unwrap();
@@ -410,7 +432,9 @@ mod tests {
         assert_eq!(request.headers,
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string()]);
+                        "Accept-Language: fr".to_string(),
+                        "User-Agent: anonymized".to_string(),
+                        ]);
 
         let builder = builder.set_url("not_an_url");
         let err = builder.build();
