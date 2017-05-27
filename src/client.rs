@@ -96,7 +96,7 @@ impl Write for CabotLibWrite {
             &buf[(header_len + 4)..buf.len()]
         }
         else {
-            &buf[..]
+            &[]
         }; 
         //debug!("Adding body {:?}", body);
         builder = builder.set_body(body);
@@ -195,4 +195,23 @@ mod tests {
 
     }
 
+    #[test]
+    fn test_build_http_no_response_body() {
+        let response = vec!["HTTP/1.1 302 Moved",
+                            "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
+                            ];
+        let response = response.join("\r\n");
+
+        let mut out = CabotLibWrite::new();
+        out.write_all(response.as_bytes()).unwrap();
+        let response = out.response().unwrap();
+        assert_eq!(response.http_version(), "HTTP/1.1");
+        assert_eq!(response.status_code(), 302);
+        assert_eq!(response.status_line(), "302 Moved");
+        let headers: &[&str] = &[
+            "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
+            ];
+        assert_eq!(response.headers(), headers);
+        assert_eq!(response.body_as_string().unwrap(), "");
+    }
 }
