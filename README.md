@@ -6,7 +6,7 @@
 
 ## Cabot is a simple RUST library to perform HTTP call.
 
-Take a look at the documentation for usage.
+Take a look at [the documentation for usage](https://docs.rs/cabot/).
 
 Unlike known alternatives, cabot does not rely on OpenSSL to perform https,
 but use [rustls](https://crates.io/crates/rustls) instead.
