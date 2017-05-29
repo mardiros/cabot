@@ -2,8 +2,7 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-use std::io::{self, Write, stderr};
-use std::io::prelude::*;
+use std::io::{Read, Write, stderr};
 use std::net::TcpStream;
 
 use rustls::{Session, ClientConfig, ClientSession, ProtocolVersion};
@@ -13,6 +12,11 @@ use log::LogLevel::Info;
 use super::request::Request;
 use super::results::{CabotResult, CabotError};
 use super::dns::Resolver;
+
+
+const BUFFER_PAGE_SIZE: usize = 1024;
+const RESPONSE_BUFFER_SIZE: usize = 1024;
+
 
 fn log_request(request: &str, verbose: bool) {
     if !log_enabled!(Info) && !verbose {
@@ -31,6 +35,27 @@ fn log_request(request: &str, verbose: bool) {
     }
 }
 
+
+fn read_buf<T>(mut client: &mut T,
+               mut buf: &mut [u8]) -> Vec<u8> where T: Read + Sized {
+    let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
+    loop {
+        match client.read(&mut buf[..]) {
+            Ok(count) => {
+                if count > 0 {
+                    response.extend_from_slice(&buf[0..count]);
+                }
+                else {
+                    break
+                }
+            }
+            Err(_) => { break } // connection is closed by client
+        }
+    }
+    response
+}
+
+
 fn from_http(request: &Request,
                  mut client: &mut TcpStream,
                  mut out: &mut Write,
@@ -42,9 +67,8 @@ fn from_http(request: &Request,
 
     debug!("Sending request {}", request_str);
     client.write(request_str.as_bytes()).unwrap();
-
-    let mut response:Vec<u8> = Vec::new();
-    client.read_to_end(&mut response).unwrap();
+    let mut buf = [0; BUFFER_PAGE_SIZE];
+    let response = read_buf(client, &mut buf);
     out.write_all(response.as_slice()).unwrap();
     Ok(())
 }
@@ -56,13 +80,14 @@ fn from_https(request: &Request,
                   -> CabotResult<()> {
 
     let request_str = request.to_string();
+    let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
+    let mut buf = [0; BUFFER_PAGE_SIZE];
 
     let mut config = ClientConfig::new();
     config.root_store.add_trust_anchors(&webpki_roots::ROOTS);
     let rc_config = Arc::new(config);
     let mut tlsclient = ClientSession::new(&rc_config, request.host());
     let mut is_handshaking = true;
-    let mut response: Vec<u8> = Vec::new();
     loop {
         while tlsclient.wants_write() {
             let count = tlsclient.write_tls(&mut client).unwrap();
@@ -121,23 +146,8 @@ fn from_https(request: &Request,
                 return Err(CabotError::CertificateError(format!("{}", err)));
             }
 
-            let mut part: Vec<u8> = Vec::new();
-            let clearcount = tlsclient.read_to_end(&mut part);
-            if let Err(err) = clearcount {
-                response.append(&mut part);
-
-                if err.kind() == io::ErrorKind::ConnectionAborted {
-                    break;
-                }
-                error!("{:?}", err);
-                return Err(CabotError::IOError(format!("{}", err)));
-            } else {
-                let clearcount = clearcount.unwrap();
-                debug!("Read {} clear bytes", clearcount);
-                if clearcount > 0 {
-                    response.append(&mut part);
-                }
-            }
+            let mut part: Vec<u8> = read_buf(&mut tlsclient, &mut buf);
+            response.append(&mut part);
         } else {
             break;
         }
