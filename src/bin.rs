@@ -200,12 +200,13 @@ impl<'a> Write for CabotBinWrite<'a> {
             writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
         }
 
-        self.out.write_all(body.as_bytes()).unwrap();
+        self.out.write_all(body.as_bytes())?;
+        self.flush()?;
         Ok(())
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        stderr().flush()
+        self.out.flush()
     }
 
     // Don't implemented unused method
