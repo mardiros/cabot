@@ -14,7 +14,7 @@
 //!
 //! ```bash
 //! $ cabot https://www.rust-lang.org/en-US/ | head -n 10 | grep "description"
-//! <meta name="description" content="A systems programming language that runs 
+//! <meta name="description" content="A systems programming language that runs
 //! blazingly fast, prevents segfaults, and guarantees thread safety.">
 //! ```
 //!

@@ -26,48 +26,40 @@ pub fn run() -> CabotResult<()> {
         .version(constants::VERSION)
         .author("Guillaume Gauvrit <guillaume@gauvr.it>")
         .about("http(s) client")
-
         .arg(Arg::with_name("URL")
             .index(1)
             .required(true)
             .help("URL to request"))
-
         .arg(Arg::with_name("REQUEST")
             .short("X")
             .long("request")
             .default_value("GET")
             .help("Specify request command to use"))
-
         .arg(Arg::with_name("HEADER")
             .short("H")
             .long("header")
             .takes_value(true)
             .multiple(true)
             .help("Pass custom header to server"))
-
         .arg(Arg::with_name("FILE")
             .short("o")
             .long("output")
             .takes_value(true)
             .help("Write to FILE instead of stdout"))
-
         .arg(Arg::with_name("VERBOSE")
             .short("v")
             .long("verbose")
             .help("Make the operation more talkative"))
-
         .arg(Arg::with_name("BODY")
             .short("d")
             .long("data")
             .takes_value(true)
             .help("Post Data (Using utf-8 encoding)"))
-
         .arg(Arg::with_name("UA")
             .short("A")
             .long("user-agent")
             .default_value(constants::USER_AGENT)
             .help("Post Data (Using utf-8 encoding)"))
-
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
@@ -97,10 +89,13 @@ pub fn run() -> CabotResult<()> {
             .write(true)
             .create(true)
             .truncate(true)
-            .open(path).unwrap();
+            .open(path)
+            .unwrap();
         http::http_query(&request, &mut CabotBinWrite::new(&mut f, verbose), verbose)?;
     } else {
-        http::http_query(&request, &mut CabotBinWrite::new(&mut io::stdout(), verbose), verbose)?;
+        http::http_query(&request,
+                         &mut CabotBinWrite::new(&mut io::stdout(), verbose),
+                         verbose)?;
     };
 
     Ok(())
@@ -158,13 +153,15 @@ struct CabotBinWrite<'a> {
 
 impl<'a> CabotBinWrite<'a> {
     pub fn new(out: &'a mut Write, verbose: bool) -> Self {
-        CabotBinWrite{ out: out, verbose: verbose}
+        CabotBinWrite {
+            out: out,
+            verbose: verbose,
+        }
     }
 }
 
 
 impl<'a> Write for CabotBinWrite<'a> {
-
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
 
 
@@ -179,8 +176,7 @@ impl<'a> Write for CabotBinWrite<'a> {
                 for part in split {
                     info!("< {}", part);
                 }
-            }
-            else if self.verbose {
+            } else if self.verbose {
                 for part in split {
                     writeln!(&mut stderr(), "< {}", part).unwrap();
                 }
@@ -195,8 +191,7 @@ impl<'a> Write for CabotBinWrite<'a> {
 
         if log_enabled!(Info) {
             info!("< [[{} bytes]]", body.len());
-        }
-        else if self.verbose {
+        } else if self.verbose {
             writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
         }
 
@@ -219,5 +214,4 @@ impl<'a> Write for CabotBinWrite<'a> {
     fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
-
 }

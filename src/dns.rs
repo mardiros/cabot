@@ -5,12 +5,12 @@ use std::net::{ToSocketAddrs, SocketAddr};
 use log::LogLevel::Info;
 
 pub struct Resolver {
-    verbose: bool
+    verbose: bool,
 }
 
 impl Resolver {
     pub fn new(verbose: bool) -> Self {
-        Resolver {verbose: verbose}
+        Resolver { verbose: verbose }
     }
     pub fn get_addr(&self, authority: &str) -> SocketAddr {
         debug!("Resolving TCP Endpoint for authority {}", authority);
@@ -19,11 +19,12 @@ impl Resolver {
             .next().unwrap(); // get first item from iterator
         if log_enabled!(Info) {
             info!("Authority {} has been resolved to {}", authority, addr);
-        }
-        else if self.verbose {
+        } else if self.verbose {
             writeln!(&mut stderr(),
                      "* Authority {} has been resolved to {}",
-                     authority, addr).unwrap();
+                     authority,
+                     addr)
+                .unwrap();
         }
         addr
     }

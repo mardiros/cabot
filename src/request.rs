@@ -76,9 +76,7 @@ impl Request {
     pub fn body(&self) -> Option<&[u8]> {
         match self.body {
             None => None,
-            Some(ref body) => {
-                Some(body.as_slice())
-            }
+            Some(ref body) => Some(body.as_slice()),
         }
     }
 
@@ -98,7 +96,8 @@ impl Request {
                 body_vec.extend_from_slice(body);
                 let body_str = String::from_utf8(body_vec);
                 if body_str.is_err() {
-                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}", body_str.unwrap_err())))
+                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}",
+                                                                 body_str.unwrap_err())));
                 }
                 body_str.unwrap()
             }
@@ -417,8 +416,7 @@ mod tests {
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
                         "Accept-Language: fr".to_string(),
-                        "User-Agent: anonymized".to_string(),
-                        ]);
+                        "User-Agent: anonymized".to_string()]);
 
         let builder = builder.set_url("http://[::1]/path");
         let request = builder.build().unwrap();
@@ -433,8 +431,7 @@ mod tests {
                    vec!["Content-Type: application/json".to_string(),
                         "Accept-Encoding: deflate".to_string(),
                         "Accept-Language: fr".to_string(),
-                        "User-Agent: anonymized".to_string(),
-                        ]);
+                        "User-Agent: anonymized".to_string()]);
 
         let builder = builder.set_url("not_an_url");
         let err = builder.build();

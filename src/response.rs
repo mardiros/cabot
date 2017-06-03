@@ -1,7 +1,7 @@
 //! HTTP Response handling.
 //! The TCP response stream is converted to a
 //! [Response](../response/struct.Response.html) structure.
-//! 
+//!
 //! # Example
 //! ```
 //! use cabot::response::ResponseBuilder;
@@ -36,7 +36,7 @@ pub struct Response {
 
 
 impl Response {
-    fn new(http_version:String,
+    fn new(http_version: String,
            status_code: usize,
            status_line: String,
            headers: Vec<String>,
@@ -63,7 +63,7 @@ impl Response {
         self.status_code
     }
 
-    /// The status line such as `200 Ok`. The status line as defined in 
+    /// The status line such as `200 Ok`. The status line as defined in
     /// [rfc7230](https://tools.ietf.org/html/rfc7230#section-3.1.1) also
     /// contains the http version, but, for convenience, it has been stripped
     /// here but is available using the `http_version()` method.
@@ -85,9 +85,7 @@ impl Response {
     pub fn body(&self) -> Option<&[u8]> {
         match self.body {
             None => None,
-            Some(ref body) => {
-                Some(body.as_slice())
-            }
+            Some(ref body) => Some(body.as_slice()),
         }
     }
 
@@ -107,7 +105,8 @@ impl Response {
                 body_vec.extend_from_slice(body);
                 let body_str = String::from_utf8(body_vec);
                 if body_str.is_err() {
-                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}", body_str.unwrap_err())))
+                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}",
+                                                                 body_str.unwrap_err())));
                 }
                 body_str.unwrap()
             }
@@ -128,7 +127,6 @@ pub struct ResponseBuilder {
 }
 
 impl ResponseBuilder {
-
     /// Construct a ResponseBuilder
     pub fn new() -> Self {
         ResponseBuilder {
@@ -152,7 +150,7 @@ impl ResponseBuilder {
 
     /// Set a response body
     pub fn set_body(mut self, buf: &[u8]) -> Self {
-        let mut body = Vec::with_capacity(buf.len()); 
+        let mut body = Vec::with_capacity(buf.len());
         body.extend_from_slice(buf);
         self.body = Some(body);
         self
@@ -168,18 +166,22 @@ impl ResponseBuilder {
         let mut vec_status_line: Vec<&str> = status_line.splitn(3, " ").collect();
 
         if vec_status_line.len() != 3 {
-            return Err(CabotError::HttpResponseParseError(format!("Malformed Status Line: {}", status_line)));
+            return Err(CabotError::HttpResponseParseError(format!("Malformed Status Line: {}",
+                                                                  status_line)));
         }
 
         let http_version = vec_status_line.remove(0);
         if !http_version.starts_with("HTTP/") {
-            return Err(CabotError::HttpResponseParseError(format!("Unkown Protocol in Status Line: {}", status_line)));
+            return Err(CabotError::HttpResponseParseError(format!("Unkown Protocol in Status \
+                                                                   Line: {}",
+                                                                  status_line)));
         }
 
         let status_code = vec_status_line.get(0).unwrap();
         let status_code: Result<usize, ParseIntError> = status_code.parse();
         if status_code.is_err() {
-            return Err(CabotError::HttpResponseParseError(format!("Malformed status code: {}", status_line)));
+            return Err(CabotError::HttpResponseParseError(format!("Malformed status code: {}",
+                                                                  status_line)));
         }
         let status_code = status_code.unwrap();
         let status_line = vec_status_line.as_slice().join(" ");
@@ -198,12 +200,11 @@ mod tests {
 
     #[test]
     fn test_response_ok() {
-        let response = Response::new(
-            "HTTP/1.1".to_owned(),
-            200,
-            "200 Ok".to_owned(),
-            vec!["Content-Type: application/json".to_owned()],
-            Some(vec![123, 125]));
+        let response = Response::new("HTTP/1.1".to_owned(),
+                                     200,
+                                     "200 Ok".to_owned(),
+                                     vec!["Content-Type: application/json".to_owned()],
+                                     Some(vec![123, 125]));
 
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -216,12 +217,11 @@ mod tests {
 
     #[test]
     fn test_response_ok_no_body() {
-        let response = Response::new(
-            "HTTP/1.1".to_owned(),
-            204,
-            "204 No Content".to_owned(),
-            vec![],
-            None);
+        let response = Response::new("HTTP/1.1".to_owned(),
+                                     204,
+                                     "204 No Content".to_owned(),
+                                     vec![],
+                                     None);
 
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 204);

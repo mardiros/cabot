@@ -20,15 +20,14 @@ const RESPONSE_BUFFER_SIZE: usize = 1024;
 
 fn log_request(request: &str, verbose: bool) {
     if !log_enabled!(Info) && !verbose {
-        return
+        return;
     }
     let split = request.split("\r\n");
     if log_enabled!(Info) {
         for part in split {
             info!("> {}", part);
         }
-    }
-    else if verbose {
+    } else if verbose {
         for part in split {
             writeln!(&mut stderr(), "> {}", part).unwrap();
         }
@@ -36,20 +35,20 @@ fn log_request(request: &str, verbose: bool) {
 }
 
 
-fn read_buf<T>(mut client: &mut T,
-               mut buf: &mut [u8]) -> Vec<u8> where T: Read + Sized {
+fn read_buf<T>(mut client: &mut T, mut buf: &mut [u8]) -> Vec<u8>
+    where T: Read + Sized
+{
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
     loop {
         match client.read(&mut buf[..]) {
             Ok(count) => {
                 if count > 0 {
                     response.extend_from_slice(&buf[0..count]);
-                }
-                else {
-                    break
+                } else {
+                    break;
                 }
             }
-            Err(_) => { break } // connection is closed by client
+            Err(_) => break, // connection is closed by client
         }
     }
     response
@@ -57,10 +56,10 @@ fn read_buf<T>(mut client: &mut T,
 
 
 fn from_http(request: &Request,
-                 mut client: &mut TcpStream,
-                 mut out: &mut Write,
-                 verbose: bool)
-                 -> CabotResult<()> {
+             mut client: &mut TcpStream,
+             mut out: &mut Write,
+             verbose: bool)
+             -> CabotResult<()> {
 
     let request_str = request.to_string();
     log_request(&request_str, verbose);
@@ -74,10 +73,10 @@ fn from_http(request: &Request,
 }
 
 fn from_https(request: &Request,
-                  mut client: &mut TcpStream,
-                  mut out: &mut Write,
-                  verbose: bool)
-                  -> CabotResult<()> {
+              mut client: &mut TcpStream,
+              mut out: &mut Write,
+              verbose: bool)
+              -> CabotResult<()> {
 
     let request_str = request.to_string();
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
@@ -100,25 +99,25 @@ fn from_https(request: &Request,
             match protocol {
                 Some(ProtocolVersion::SSLv2) => {
                     info!("Protocol SSL v2 negociated");
-                },
+                }
                 Some(ProtocolVersion::SSLv3) => {
                     info!("Protocol SSL v3 negociated");
-                },
+                }
                 Some(ProtocolVersion::TLSv1_0) => {
                     info!("Protocol TLS v1.0 negociated");
-                },
+                }
                 Some(ProtocolVersion::TLSv1_1) => {
                     info!("Protocol TLS v1.1 negociated");
-                },
+                }
                 Some(ProtocolVersion::TLSv1_2) => {
                     info!("Protocol TLS v1.2 negociated");
-                },
+                }
                 Some(ProtocolVersion::TLSv1_3) => {
                     info!("Protocol TLS v1.3 negociated");
-                },
+                }
                 Some(ProtocolVersion::Unknown(num)) => {
                     info!("Unknown TLS Protocol negociated: {}", num);
-                },
+                }
                 None => {
                     info!("No TLS Protocol negociated");
                 }
@@ -157,11 +156,10 @@ fn from_https(request: &Request,
 }
 
 
-pub fn http_query(request: &Request,
-                  mut out: &mut Write,
-                  verbose: bool)
-                  -> CabotResult<()> {
-    debug!("HTTP Query {} {}", request.http_method(), request.request_uri());
+pub fn http_query(request: &Request, mut out: &mut Write, verbose: bool) -> CabotResult<()> {
+    debug!("HTTP Query {} {}",
+           request.http_method(),
+           request.request_uri());
 
     let resolver = Resolver::new(verbose);
     let authority = request.authority();
