@@ -184,9 +184,10 @@ impl<'a> Write for CabotBinWrite<'a> {
         }
 
         let body = if response.len() == 2 {
-            response.get(1).unwrap()
+            let start = response.get(0).unwrap().len() + 4;
+            &buf[start..]
         } else {
-            response.get(0).unwrap()
+            &buf[..]
         };
 
         if log_enabled!(Info) {
@@ -195,7 +196,7 @@ impl<'a> Write for CabotBinWrite<'a> {
             writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
         }
 
-        self.out.write_all(body.as_bytes())?;
+        self.out.write_all(body)?;
         self.flush()?;
         Ok(())
     }
