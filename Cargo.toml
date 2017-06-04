@@ -1,6 +1,6 @@
 [package]
 name = "cabot"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Guillaume Gauvrit <guillaume@gauvr.it>"]
 readme = "README.md"
 keywords = ["http", "https", "request", "client"]
