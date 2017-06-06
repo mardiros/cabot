@@ -17,8 +17,7 @@ use clap::{App, Arg};
 use cabot::results::{CabotResult, CabotError};
 use cabot::http;
 use cabot::request::RequestBuilder;
-
-mod constants;
+use cabot::constants;
 
 
 pub fn run() -> CabotResult<()> {
@@ -164,14 +163,13 @@ impl<'a> CabotBinWrite<'a> {
 impl<'a> Write for CabotBinWrite<'a> {
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
 
-
-        let response = String::from_utf8_lossy(buf);
-        let response: Vec<&str> = response.splitn(2, "\r\n\r\n").collect();
+        let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
 
         // If there is headers and we logged them
         if response.len() == 2 && (log_enabled!(Info) || self.verbose) {
             let headers = response.get(0).unwrap();
-            let split = headers.split("\n");
+            let headers = String::from_utf8_lossy(headers);
+            let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
             if log_enabled!(Info) {
                 for part in split {
                     info!("< {}", part);

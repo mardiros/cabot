@@ -2,11 +2,21 @@
 //!
 //! [see whats inside](../../src/cabot/constants.rs.html).
 
+use regex::Regex;
+use regex::bytes::{Regex as BytesRegex};
+
+
 /// Version of cabot
 pub const VERSION: &'static str = "0.1.2";
 
 /// Default user agent `cabot/{cabot-version}`
 pub const USER_AGENT: &'static str = "cabot/0.1.2";
+
+
+lazy_static! {
+    pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new("\r?\n\r?\n").unwrap();
+    pub static ref SPLIT_HEADER_RE: Regex = Regex::new("\r?\n").unwrap();
+}
 
 
 #[cfg(test)]

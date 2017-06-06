@@ -7,6 +7,7 @@ use super::request::Request;
 use super::http;
 use super::response::{Response, ResponseBuilder};
 use super::results::CabotResult;
+use super::constants;
 
 /// Perform the http query
 pub struct Client {
@@ -48,12 +49,11 @@ impl CabotLibWrite {
 impl Write for CabotLibWrite {
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         info!("Parsing http response");
-        let mut response = Vec::with_capacity(buf.len());
-        response.extend_from_slice(buf);
-        let response = unsafe { String::from_utf8_unchecked(response) };
-        let response: Vec<&str> = response.splitn(2, "\r\n\r\n").collect();
+        let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
         let header_len = response.get(0).unwrap().len();
-        let mut headers: Vec<&str> = response.get(0).unwrap().split("\r\n").collect();
+        let headers_str = String::from_utf8_lossy(response.get(0).unwrap());
+        let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers_str).collect();
+
         let mut builder = ResponseBuilder::new();
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);

@@ -27,6 +27,8 @@ doc = false
 clap = "^2.24.2"
 log = "^0.3.8"
 pretty_env_logger = "^0.1.0"
+lazy_static = "^0.2.5"
+regex = "^0.2.2"
 
 rustls = "^0.8.0"
 webpki-roots = "^0.10.0"
