@@ -3,7 +3,7 @@
 //! [see whats inside](../../src/cabot/constants.rs.html).
 
 use regex::Regex;
-use regex::bytes::{Regex as BytesRegex};
+use regex::bytes::Regex as BytesRegex;
 
 
 /// Version of cabot
