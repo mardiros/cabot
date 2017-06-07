@@ -12,25 +12,41 @@ use log::LogLevel::Info;
 use super::request::Request;
 use super::results::{CabotResult, CabotError};
 use super::dns::Resolver;
-
+use super::constants;
 
 const BUFFER_PAGE_SIZE: usize = 1024;
 const RESPONSE_BUFFER_SIZE: usize = 1024;
 
 
-fn log_request(request: &str, verbose: bool) {
+fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
         return;
     }
-    let split = request.split("\r\n");
+    let request: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(request, 2).collect();
+    let headers = String::from_utf8_lossy(request.get(0).unwrap());
+    let headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
+    let bodylen = if request.len() == 2 {
+        let body = request.get(1).unwrap();
+        body.len()
+    } else {
+        0
+    };
     if log_enabled!(Info) {
-        for part in split {
-            info!("> {}", part);
+        for header in headers {
+            info!("> {}", header);
         }
+        if bodylen > 0 {
+            info!("> [{} bytes]", bodylen);
+        }
+        info!(">");
     } else if verbose {
-        for part in split {
-            writeln!(&mut stderr(), "> {}", part).unwrap();
+        for header in headers {
+            writeln!(&mut stderr(), "> {}", header).unwrap();
         }
+        if bodylen > 0 {
+            writeln!(&mut stderr(), "> [{} bytes]", bodylen).unwrap();
+        }
+        writeln!(&mut stderr(), ">").unwrap();
     }
 }
 
@@ -61,11 +77,12 @@ fn from_http(request: &Request,
              verbose: bool)
              -> CabotResult<()> {
 
-    let request_str = request.to_string();
-    log_request(&request_str, verbose);
+    let request_bytes = request.to_bytes();
+    let raw_request = request_bytes.as_slice();
+    log_request(&raw_request, verbose);
 
-    debug!("Sending request {}", request_str);
-    client.write(request_str.as_bytes()).unwrap();
+    debug!("Sending request...");
+    client.write(&raw_request).unwrap();
     let mut buf = [0; BUFFER_PAGE_SIZE];
     let response = read_buf(client, &mut buf);
     out.write_all(response.as_slice()).unwrap();
@@ -78,7 +95,8 @@ fn from_https(request: &Request,
               verbose: bool)
               -> CabotResult<()> {
 
-    let request_str = request.to_string();
+    let request_bytes = request.to_bytes();
+    let raw_request = request_bytes.as_slice();
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
     let mut buf = [0; BUFFER_PAGE_SIZE];
 
@@ -122,8 +140,8 @@ fn from_https(request: &Request,
                     info!("No TLS Protocol negociated");
                 }
             }
-            log_request(&request_str, verbose);
-            tlsclient.write_all(request_str.as_bytes()).unwrap();
+            log_request(&raw_request, verbose);
+            tlsclient.write_all(&raw_request).unwrap();
             let count = tlsclient.write_tls(&mut client).unwrap();
             debug!("Write {} TLS bytes", count);
         }

@@ -134,29 +134,40 @@ impl Request {
     pub fn request_uri(&self) -> &str {
         self.request_uri.as_str()
     }
+    /// The Bytes representation of the query to send to the server.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut resp = Vec::with_capacity(1024 +
+                                          match self.body() {
+            Some(bytes) => bytes.len(),
+            None => 0,
+        });
+        resp.extend_from_slice(format!("{} {} {}\r\n",
+                                       self.http_method(),
+                                       self.request_uri(),
+                                       self.http_version())
+            .as_bytes());
 
-    /// The String representation of the query to send to the server.
-    pub fn to_string(&self) -> String {
-        let mut resp = format!("{} {} {}\r\n",
-                               self.http_method(),
-                               self.request_uri(),
-                               self.http_version());
-        if self.headers.len() > 0 {
-            resp.push_str(self.headers.as_slice().join("\r\n").as_str());
-            resp.push_str("\r\n");
+        for header in self.headers.as_slice() {
+            resp.extend_from_slice(format!("{}\r\n", header).as_bytes());
         }
         if self.is_domain {
-            resp.push_str(format!("Host: {}\r\n", self.host()).as_str());
+            resp.extend_from_slice(format!("Host: {}\r\n", self.host()).as_bytes());
         }
-        resp.push_str("Connection: close\r\n");
-        if let Ok(Some(payload)) = self.body_as_string() {
-            resp.push_str(format!("Content-Length: {}\r\n", payload.len()).as_str());
-            resp.push_str("\r\n");
-            resp.push_str(payload.as_str());
+        resp.extend_from_slice(b"Connection: close\r\n");
+        if let Some(payload) = self.body() {
+            resp.extend_from_slice(format!("Content-Length: {}\r\n\r\n", payload.len()).as_bytes());
+            resp.extend_from_slice(payload);
         } else {
-            resp.push_str("\r\n");
+            resp.extend_from_slice(b"\r\n");
         }
         resp
+    }
+
+    /// The String representation of the query.
+    /// This method could panic in case the request is not utf-8 bytes.
+    pub fn to_string(&self) -> String {
+        let req = self.to_bytes();
+        String::from_utf8(req).unwrap()
     }
 }
 
