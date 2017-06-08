@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_request_wiht_host_to_string() {
+    fn test_get_request_with_host_to_string() {
         let request = Request::new("localhost".to_owned(),
                                    80,
                                    "localhost:80".to_owned(),
