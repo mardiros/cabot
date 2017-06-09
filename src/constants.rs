@@ -7,10 +7,10 @@ use regex::bytes::Regex as BytesRegex;
 
 
 /// Version of cabot
-pub const VERSION: &'static str = "0.1.2";
+pub const VERSION: &'static str = "0.1.3";
 
 /// Default user agent `cabot/{cabot-version}`
-pub const USER_AGENT: &'static str = "cabot/0.1.2";
+pub const USER_AGENT: &'static str = "cabot/0.1.3";
 
 
 lazy_static! {
