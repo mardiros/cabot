@@ -46,6 +46,7 @@ extern crate log;
 
 extern crate url;
 extern crate rustls;
+extern crate webpki;
 extern crate webpki_roots;
 #[macro_use]
 extern crate lazy_static;

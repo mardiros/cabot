@@ -6,6 +6,7 @@ use std::io::{Read, Write, stderr};
 use std::net::TcpStream;
 
 use rustls::{Session, ClientConfig, ClientSession, ProtocolVersion};
+use webpki::DNSNameRef;
 use webpki_roots;
 use log::LogLevel::Info;
 
@@ -51,7 +52,7 @@ fn log_request(request: &[u8], verbose: bool) {
 }
 
 
-fn read_buf<T>(mut client: &mut T, mut buf: &mut [u8]) -> Vec<u8>
+fn read_buf<T>(client: &mut T, buf: &mut [u8]) -> Vec<u8>
     where T: Read + Sized
 {
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
@@ -72,8 +73,8 @@ fn read_buf<T>(mut client: &mut T, mut buf: &mut [u8]) -> Vec<u8>
 
 
 fn from_http(request: &Request,
-             mut client: &mut TcpStream,
-             mut out: &mut Write,
+             client: &mut TcpStream,
+             out: &mut Write,
              verbose: bool)
              -> CabotResult<()> {
 
@@ -91,7 +92,7 @@ fn from_http(request: &Request,
 
 fn from_https(request: &Request,
               mut client: &mut TcpStream,
-              mut out: &mut Write,
+              out: &mut Write,
               verbose: bool)
               -> CabotResult<()> {
 
@@ -101,9 +102,13 @@ fn from_https(request: &Request,
     let mut buf = [0; BUFFER_PAGE_SIZE];
 
     let mut config = ClientConfig::new();
-    config.root_store.add_trust_anchors(&webpki_roots::ROOTS);
+    config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
     let rc_config = Arc::new(config);
-    let mut tlsclient = ClientSession::new(&rc_config, request.host());
+    let host = DNSNameRef::try_from_ascii_str(request.host());
+    if host.is_err() {
+        return Err(CabotError::HostnameParseError(request.host().to_owned()))
+    }
+    let mut tlsclient = ClientSession::new(&rc_config, host.unwrap());
     let mut is_handshaking = true;
     loop {
         while tlsclient.wants_write() {

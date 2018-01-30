@@ -9,6 +9,7 @@ pub enum CabotError {
     IOError(String),
     CertificateError(String),
     SchemeError(String),
+    HostnameParseError(String),
     OpaqueUrlError(String),
     UrlParseError(url::ParseError),
     HttpResponseParseError(String),

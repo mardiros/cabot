@@ -117,6 +117,11 @@ fn main() {
             let _ = writeln!(&mut std::io::stderr(), "Opaque URL Error: {}", err);
             std::process::exit(1);
         }
+        
+        Err(CabotError::HostnameParseError(name)) => {
+            let _ = writeln!(&mut std::io::stderr(), "Invalid hostname: {}", name);
+            std::process::exit(1);
+        }
         Err(CabotError::UrlParseError(err)) => {
             let _ = writeln!(&mut std::io::stderr(), "URL Parse Error: {}", err);
             std::process::exit(1);
