@@ -1,9 +1,15 @@
 # CHANGELOG
 
+## cabot 0.1.4 2018-01-30
+
+ * Update dependencies.
+
+
 ## cabot 0.1.3 2017-06-09
 
  * Convert request to bytes instead of string to send it.
  * Split http response headers using bytes regex.
+
 
 ## cabot 0.1.2 2017-06-04
 
