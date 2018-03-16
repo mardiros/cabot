@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## cabot 0.2.0 2018-03-16
+
+ * Don't panic in case of network errors.
+ * Add a --resolve command line argument to force resolution to a given address, avoid DNS resolution.
+ * Add Client.add_authority method to force resolution to a given address, avoid DNS resolution.
+ * Internal function `http::http_query` signature changes for the new host resolution feature.
+
 ## cabot 0.1.4 2018-01-30
 
  * Update dependencies.
