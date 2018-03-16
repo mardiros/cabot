@@ -189,7 +189,11 @@ pub fn http_query(request: &Request, mut out: &mut Write, verbose: bool) -> Cabo
     let addr = resolver.get_addr(authority)?;
 
     info!("Connecting to {}", addr);
-    let mut client = TcpStream::connect(addr).unwrap();
+    let client = TcpStream::connect(addr);
+    if client.is_err() {
+        return Err(CabotError::IOError(format!("{}", client.unwrap_err())));
+    }
+    let mut client = client.unwrap();
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
     match request.scheme() {
