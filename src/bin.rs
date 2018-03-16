@@ -130,6 +130,10 @@ fn main() {
             let _ = writeln!(&mut std::io::stderr(), "IOError: {}", err);
             std::process::exit(1);
         }
+        Err(CabotError::DNSLookupError(err)) => {
+            let _ = writeln!(&mut std::io::stderr(), "DNSLookupError: {}", err);
+            std::process::exit(1);
+        }
         Err(CabotError::CertificateError(err)) => {
             let _ = writeln!(&mut std::io::stderr(), "CertificateError: {}", err);
             std::process::exit(1);

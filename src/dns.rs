@@ -4,6 +4,8 @@ use std::io::{Write, stderr};
 use std::net::{ToSocketAddrs, SocketAddr};
 use log::LogLevel::Info;
 
+use super::results::{CabotResult, CabotError};
+
 pub struct Resolver {
     verbose: bool,
 }
@@ -12,11 +14,18 @@ impl Resolver {
     pub fn new(verbose: bool) -> Self {
         Resolver { verbose: verbose }
     }
-    pub fn get_addr(&self, authority: &str) -> SocketAddr {
+    pub fn get_addr(&self, authority: &str) -> CabotResult<SocketAddr> {
         debug!("Resolving TCP Endpoint for authority {}", authority);
-        let addr = authority.to_socket_addrs()
-            .unwrap() // unwrap result
-            .next().unwrap(); // get first item from iterator
+        let addrs = authority.to_socket_addrs();
+        if addrs.is_err() {
+            return Err(CabotError::DNSLookupError(format!("{}", addrs.unwrap_err())));
+        }
+        let mut addrs = addrs.unwrap();
+        let addr = addrs.next(); // get first item from iterator
+        if addr.is_none() {
+            return Err(CabotError::DNSLookupError("Host does not exists".to_owned()));
+        }
+        let addr = addr.unwrap();
         if log_enabled!(Info) {
             info!("Authority {} has been resolved to {}", authority, addr);
         } else if self.verbose {
@@ -26,6 +35,6 @@ impl Resolver {
                      addr)
                 .unwrap();
         }
-        addr
+        Ok(addr)
     }
 }

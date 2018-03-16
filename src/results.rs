@@ -7,6 +7,7 @@ use url;
 /// Errors in cabot
 pub enum CabotError {
     IOError(String),
+    DNSLookupError(String),
     CertificateError(String),
     SchemeError(String),
     HostnameParseError(String),

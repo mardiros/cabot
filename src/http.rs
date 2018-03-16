@@ -186,7 +186,7 @@ pub fn http_query(request: &Request, mut out: &mut Write, verbose: bool) -> Cabo
 
     let resolver = Resolver::new(verbose);
     let authority = request.authority();
-    let addr = resolver.get_addr(authority);
+    let addr = resolver.get_addr(authority)?;
 
     info!("Connecting to {}", addr);
     let mut client = TcpStream::connect(addr).unwrap();
