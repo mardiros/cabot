@@ -2,7 +2,6 @@
 
 use url;
 
-
 #[derive(Debug, Clone)]
 /// Errors in cabot
 pub enum CabotError {

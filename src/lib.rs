@@ -44,13 +44,13 @@
 #[macro_use]
 extern crate log;
 
-extern crate url;
-extern crate rustls;
-extern crate webpki;
-extern crate webpki_roots;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
+extern crate rustls;
+extern crate url;
+extern crate webpki;
+extern crate webpki_roots;
 
 mod dns;
 

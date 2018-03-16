@@ -2,22 +2,22 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-use std::io::{Read, Write, stderr};
-use std::net::TcpStream;
+use std::io::{stderr, Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::collections::HashMap;
 
-use rustls::{Session, ClientConfig, ClientSession, ProtocolVersion};
+use rustls::{ClientConfig, ClientSession, ProtocolVersion, Session};
 use webpki::DNSNameRef;
 use webpki_roots;
 use log::LogLevel::Info;
 
 use super::request::Request;
-use super::results::{CabotResult, CabotError};
+use super::results::{CabotError, CabotResult};
 use super::dns::Resolver;
 use super::constants;
 
 const BUFFER_PAGE_SIZE: usize = 1024;
 const RESPONSE_BUFFER_SIZE: usize = 1024;
-
 
 fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
@@ -51,9 +51,9 @@ fn log_request(request: &[u8], verbose: bool) {
     }
 }
 
-
 fn read_buf<T>(client: &mut T, buf: &mut [u8]) -> Vec<u8>
-    where T: Read + Sized
+where
+    T: Read + Sized,
 {
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
     loop {
@@ -71,13 +71,12 @@ fn read_buf<T>(client: &mut T, buf: &mut [u8]) -> Vec<u8>
     response
 }
 
-
-fn from_http(request: &Request,
-             client: &mut TcpStream,
-             out: &mut Write,
-             verbose: bool)
-             -> CabotResult<()> {
-
+fn from_http(
+    request: &Request,
+    client: &mut TcpStream,
+    out: &mut Write,
+    verbose: bool,
+) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
     log_request(&raw_request, verbose);
@@ -90,23 +89,25 @@ fn from_http(request: &Request,
     Ok(())
 }
 
-fn from_https(request: &Request,
-              mut client: &mut TcpStream,
-              out: &mut Write,
-              verbose: bool)
-              -> CabotResult<()> {
-
+fn from_https(
+    request: &Request,
+    mut client: &mut TcpStream,
+    out: &mut Write,
+    verbose: bool,
+) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
     let mut buf = [0; BUFFER_PAGE_SIZE];
 
     let mut config = ClientConfig::new();
-    config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+    config
+        .root_store
+        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
     let rc_config = Arc::new(config);
     let host = DNSNameRef::try_from_ascii_str(request.host());
     if host.is_err() {
-        return Err(CabotError::HostnameParseError(request.host().to_owned()))
+        return Err(CabotError::HostnameParseError(request.host().to_owned()));
     }
     let mut tlsclient = ClientSession::new(&rc_config, host.unwrap());
     let mut is_handshaking = true;
@@ -178,15 +179,31 @@ fn from_https(request: &Request,
     Ok(())
 }
 
+pub fn http_query(
+    request: &Request,
+    mut out: &mut Write,
+    authorities: &HashMap<String, SocketAddr>,
+    verbose: bool,
+) -> CabotResult<()> {
+    debug!(
+        "HTTP Query {} {}",
+        request.http_method(),
+        request.request_uri()
+    );
 
-pub fn http_query(request: &Request, mut out: &mut Write, verbose: bool) -> CabotResult<()> {
-    debug!("HTTP Query {} {}",
-           request.http_method(),
-           request.request_uri());
-
-    let resolver = Resolver::new(verbose);
     let authority = request.authority();
-    let addr = resolver.get_addr(authority)?;
+
+    let addr = match authorities.get(authority) {
+        Some(val) => {
+            info!("Fetch authority {} using autorities map", authority);
+            val.clone()
+        }
+        None => {
+            info!("Fetch authority {} using resolver", authority);
+            let resolver = Resolver::new(verbose);
+            resolver.get_addr(authority)?
+        }
+    };
 
     info!("Connecting to {}", addr);
     let client = TcpStream::connect(addr);
@@ -200,12 +217,14 @@ pub fn http_query(request: &Request, mut out: &mut Write, verbose: bool) -> Cabo
         "http" => from_http(request, &mut client, &mut out, verbose)?,
         "https" => from_https(request, &mut client, &mut out, verbose)?,
         _ => {
-            return Err(CabotError::SchemeError(format!("Unrecognized scheme {}", request.scheme())))
+            return Err(CabotError::SchemeError(format!(
+                "Unrecognized scheme {}",
+                request.scheme()
+            )))
         }
     };
 
     out.flush().unwrap();
 
     Ok(())
-
 }

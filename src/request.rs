@@ -19,7 +19,7 @@
 
 use url::{self, Url};
 
-use super::results::{CabotResult, CabotError};
+use super::results::{CabotError, CabotResult};
 use super::constants;
 
 /// An HTTP Request representation.
@@ -41,17 +41,18 @@ pub struct Request {
 }
 
 impl Request {
-    fn new(host: String,
-           port: u16,
-           authority: String,
-           is_domain: bool,
-           scheme: String,
-           http_method: String,
-           request_uri: String,
-           http_version: String,
-           headers: Vec<String>,
-           body: Option<Vec<u8>>)
-           -> Request {
+    fn new(
+        host: String,
+        port: u16,
+        authority: String,
+        is_domain: bool,
+        scheme: String,
+        http_method: String,
+        request_uri: String,
+        http_version: String,
+        headers: Vec<String>,
+        body: Option<Vec<u8>>,
+    ) -> Request {
         Request {
             host: host,
             port: port,
@@ -96,8 +97,10 @@ impl Request {
                 body_vec.extend_from_slice(body);
                 let body_str = String::from_utf8(body_vec);
                 if body_str.is_err() {
-                    return Err(CabotError::EncodingError(format!("Cannot decode utf8: {}",
-                                                                 body_str.unwrap_err())));
+                    return Err(CabotError::EncodingError(format!(
+                        "Cannot decode utf8: {}",
+                        body_str.unwrap_err()
+                    )));
                 }
                 body_str.unwrap()
             }
@@ -136,16 +139,20 @@ impl Request {
     }
     /// The Bytes representation of the query to send to the server.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut resp = Vec::with_capacity(1024 +
-                                          match self.body() {
-            Some(bytes) => bytes.len(),
-            None => 0,
-        });
-        resp.extend_from_slice(format!("{} {} {}\r\n",
-                                       self.http_method(),
-                                       self.request_uri(),
-                                       self.http_version())
-            .as_bytes());
+        let mut resp = Vec::with_capacity(
+            1024 + match self.body() {
+                Some(bytes) => bytes.len(),
+                None => 0,
+            },
+        );
+        resp.extend_from_slice(
+            format!(
+                "{} {} {}\r\n",
+                self.http_method(),
+                self.request_uri(),
+                self.http_version()
+            ).as_bytes(),
+        );
 
         for header in self.headers.as_slice() {
             resp.extend_from_slice(format!("{}\r\n", header).as_bytes());
@@ -275,13 +282,17 @@ impl RequestBuilder {
 
         let host = url.host_str();
         if host.is_none() {
-            return Err(CabotError::OpaqueUrlError("Unable to find host".to_string()));
+            return Err(CabotError::OpaqueUrlError(
+                "Unable to find host".to_string(),
+            ));
         }
         let host = host.unwrap();
 
         let port = url.port_or_known_default();
         if port.is_none() {
-            return Err(CabotError::OpaqueUrlError("Unable to determine a port".to_string()));
+            return Err(CabotError::OpaqueUrlError(
+                "Unable to determine a port".to_string(),
+            ));
         }
         let port = port.unwrap();
 
@@ -299,22 +310,23 @@ impl RequestBuilder {
         let mut headers = self.headers.clone();
         headers.push(format!("User-Agent: {}", self.user_agent));
 
-        Ok(Request::new(host.to_owned(),
-                        port,
-                        format!("{}:{}", host, port),
-                        is_domain,
-                        url.scheme().to_owned(),
-                        self.http_method.clone(),
-                        request_uri,
-                        self.http_version.clone(),
-                        headers,
-                        match self.body {
-                            Some(ref body) => Some(body.clone()),
-                            None => None,
-                        }))
+        Ok(Request::new(
+            host.to_owned(),
+            port,
+            format!("{}:{}", host, port),
+            is_domain,
+            url.scheme().to_owned(),
+            self.http_method.clone(),
+            request_uri,
+            self.http_version.clone(),
+            headers,
+            match self.body {
+                Some(ref body) => Some(body.clone()),
+                None => None,
+            },
+        ))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -323,49 +335,57 @@ mod tests {
 
     #[test]
     fn test_get_request_to_string() {
-        let request = Request::new("127.0.0.1".to_owned(),
-                                   80,
-                                   "127.0.0.1:80".to_owned(),
-                                   false,
-                                   "http".to_owned(),
-                                   "GET".to_owned(),
-                                   "/path?query".to_owned(),
-                                   "HTTP/1.1".to_owned(),
-                                   Vec::new(),
-                                   None);
+        let request = Request::new(
+            "127.0.0.1".to_owned(),
+            80,
+            "127.0.0.1:80".to_owned(),
+            false,
+            "http".to_owned(),
+            "GET".to_owned(),
+            "/path?query".to_owned(),
+            "HTTP/1.1".to_owned(),
+            Vec::new(),
+            None,
+        );
         let attempt = "GET /path?query HTTP/1.1\r\nConnection: close\r\n\r\n";
         assert_eq!(request.to_string(), attempt);
     }
 
     #[test]
     fn test_get_request_with_host_to_string() {
-        let request = Request::new("localhost".to_owned(),
-                                   80,
-                                   "localhost:80".to_owned(),
-                                   true,
-                                   "http".to_owned(),
-                                   "GET".to_owned(),
-                                   "/path?query".to_owned(),
-                                   "HTTP/1.1".to_owned(),
-                                   Vec::new(),
-                                   None);
+        let request = Request::new(
+            "localhost".to_owned(),
+            80,
+            "localhost:80".to_owned(),
+            true,
+            "http".to_owned(),
+            "GET".to_owned(),
+            "/path?query".to_owned(),
+            "HTTP/1.1".to_owned(),
+            Vec::new(),
+            None,
+        );
         let attempt = "GET /path?query HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
         assert_eq!(request.to_string(), attempt);
     }
 
     #[test]
     fn test_get_request_with_headers_to_string() {
-        let request = Request::new("localhost".to_owned(),
-                                   80,
-                                   "localhost:80".to_owned(),
-                                   true,
-                                   "http".to_owned(),
-                                   "GET".to_owned(),
-                                   "/path?query".to_owned(),
-                                   "HTTP/1.1".to_owned(),
-                                   vec!["Accept-Language: fr".to_owned(),
-                                        "Accept-Encoding: gzip".to_owned()],
-                                   None);
+        let request = Request::new(
+            "localhost".to_owned(),
+            80,
+            "localhost:80".to_owned(),
+            true,
+            "http".to_owned(),
+            "GET".to_owned(),
+            "/path?query".to_owned(),
+            "HTTP/1.1".to_owned(),
+            vec![
+                "Accept-Language: fr".to_owned(),
+                "Accept-Encoding: gzip".to_owned(),
+            ],
+            None,
+        );
         let attempt = "GET /path?query HTTP/1.1\r\nAccept-Language: fr\r\nAccept-Encoding: \
                        gzip\r\nHost: localhost\r\nConnection: close\r\n\r\n";
         assert_eq!(request.to_string(), attempt);
@@ -374,17 +394,21 @@ mod tests {
     #[test]
     fn test_post_request_with_headers_to_string() {
         let body: Vec<u8> = vec![123, 125];
-        let request = Request::new("localhost".to_owned(),
-                                   80,
-                                   "localhost:80".to_owned(),
-                                   true,
-                                   "http".to_owned(),
-                                   "POST".to_owned(),
-                                   "/".to_owned(),
-                                   "HTTP/1.1".to_owned(),
-                                   vec!["Accept-Language: fr".to_owned(),
-                                        "Content-Type: application/json".to_owned()],
-                                   Some(body));
+        let request = Request::new(
+            "localhost".to_owned(),
+            80,
+            "localhost:80".to_owned(),
+            true,
+            "http".to_owned(),
+            "POST".to_owned(),
+            "/".to_owned(),
+            "HTTP/1.1".to_owned(),
+            vec![
+                "Accept-Language: fr".to_owned(),
+                "Content-Type: application/json".to_owned(),
+            ],
+            Some(body),
+        );
         let attempt = "POST / HTTP/1.1\r\nAccept-Language: fr\r\nContent-Type: \
                        application/json\r\nHost: localhost\r\nConnection: \
                        close\r\nContent-Length: 2\r\n\r\n{}";
@@ -393,9 +417,7 @@ mod tests {
 
     #[test]
     fn test_request_builder_simple() {
-        let request = RequestBuilder::new("http://localhost/")
-            .build()
-            .unwrap();
+        let request = RequestBuilder::new("http://localhost/").build().unwrap();
         assert_eq!(request.host(), "localhost".to_string());
         assert_eq!(request.scheme(), "http".to_string());
         assert_eq!(request.body, None);
@@ -423,11 +445,15 @@ mod tests {
         assert_eq!(request.http_method(), "POST".to_string());
         assert_eq!(request.request_uri(), "/");
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
-        assert_eq!(request.headers,
-                   vec!["Content-Type: application/json".to_string(),
-                        "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string(),
-                        "User-Agent: anonymized".to_string()]);
+        assert_eq!(
+            request.headers,
+            vec![
+                "Content-Type: application/json".to_string(),
+                "Accept-Encoding: deflate".to_string(),
+                "Accept-Language: fr".to_string(),
+                "User-Agent: anonymized".to_string(),
+            ]
+        );
 
         let builder = builder.set_url("http://[::1]/path");
         let request = builder.build().unwrap();
@@ -438,11 +464,15 @@ mod tests {
         assert_eq!(request.scheme(), "http".to_string());
         assert_eq!(request.http_method(), "POST".to_string());
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
-        assert_eq!(request.headers,
-                   vec!["Content-Type: application/json".to_string(),
-                        "Accept-Encoding: deflate".to_string(),
-                        "Accept-Language: fr".to_string(),
-                        "User-Agent: anonymized".to_string()]);
+        assert_eq!(
+            request.headers,
+            vec![
+                "Content-Type: application/json".to_string(),
+                "Accept-Encoding: deflate".to_string(),
+                "Accept-Language: fr".to_string(),
+                "User-Agent: anonymized".to_string(),
+            ]
+        );
 
         let builder = builder.set_url("not_an_url");
         let err = builder.build();

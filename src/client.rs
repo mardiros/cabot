@@ -2,6 +2,8 @@
 
 use std::io::{self, Write};
 use std::fmt::Arguments;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
 use super::request::Request;
 use super::http;
@@ -12,33 +14,43 @@ use super::constants;
 /// Perform the http query
 pub struct Client {
     verbose: bool,
+    authorities: HashMap<String, SocketAddr>,
 }
-
 
 impl Client {
     /// Construct a new `Client`
     pub fn new() -> Self {
-        Client { verbose: false }
+        Client {
+            verbose: false,
+            authorities: HashMap::new(),
+        }
+    }
+
+    /// Avoid DNS resolution, force an address to be resolve to a given endpoint.
+    /// authority has the format "host:port".
+    pub fn add_authority(&mut self, authority: &str, sock_addr: &SocketAddr) {
+        self.authorities
+            .insert(authority.to_owned(), sock_addr.clone());
     }
 
     /// Execute the query [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
     pub fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
-        http::http_query(&request, &mut out, self.verbose)?;
+        http::http_query(&request, &mut out, &self.authorities, self.verbose)?;
         out.response()
     }
 }
-
 
 struct CabotLibWrite {
     response_builder: ResponseBuilder,
 }
 
-
 impl CabotLibWrite {
     pub fn new() -> Self {
-        CabotLibWrite { response_builder: ResponseBuilder::new() }
+        CabotLibWrite {
+            response_builder: ResponseBuilder::new(),
+        }
     }
 
     pub fn response(&self) -> CabotResult<Response> {
@@ -108,7 +120,6 @@ impl Write for CabotLibWrite {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
 
-
     fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
@@ -120,11 +131,13 @@ mod tests {
 
     #[test]
     fn test_build_http_response_from_string() {
-        let response = vec!["HTTP/1.1 200 Ok",
-                            "Content-Type: text/plain",
-                            "Content-Length: 12",
-                            "",
-                            "Hello World!"];
+        let response = vec![
+            "HTTP/1.1 200 Ok",
+            "Content-Type: text/plain",
+            "Content-Length: 12",
+            "",
+            "Hello World!",
+        ];
         let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
@@ -135,19 +148,22 @@ mod tests {
         assert_eq!(response.status_line(), "200 Ok");
         let headers: &[&str] = &["Content-Type: text/plain", "Content-Length: 12"];
         assert_eq!(response.headers(), headers);
-        assert_eq!(response.body_as_string().unwrap(),
-                   "Hello World!".to_owned());
-
+        assert_eq!(
+            response.body_as_string().unwrap(),
+            "Hello World!".to_owned()
+        );
     }
 
     #[test]
     fn test_build_http_header_obsolete_line_folding() {
-        let response = vec!["HTTP/1.1 200 Ok",
-                            "ows: https://tools.ietf.org/html/rfc7230",
-                            "  #section-3.2.4",
-                            "Content-Length: 12",
-                            "",
-                            "Hello World!"];
+        let response = vec![
+            "HTTP/1.1 200 Ok",
+            "ows: https://tools.ietf.org/html/rfc7230",
+            "  #section-3.2.4",
+            "Content-Length: 12",
+            "",
+            "Hello World!",
+        ];
         let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
@@ -156,22 +172,27 @@ mod tests {
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
         assert_eq!(response.status_line(), "200 Ok");
-        let headers: &[&str] = &["ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
-                                 "Content-Length: 12"];
+        let headers: &[&str] = &[
+            "ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
+            "Content-Length: 12",
+        ];
         assert_eq!(response.headers(), headers);
-        assert_eq!(response.body_as_string().unwrap(),
-                   "Hello World!".to_owned());
-
+        assert_eq!(
+            response.body_as_string().unwrap(),
+            "Hello World!".to_owned()
+        );
     }
 
     #[test]
     fn test_build_http_header_obsolete_line_folding_tab() {
-        let response = vec!["HTTP/1.1 200 Ok",
-                            "ows: https://tools.ietf.org/html/rfc7230",
-                            "\t#section-3.2.4",
-                            "Content-Length: 12",
-                            "",
-                            "Hello World!"];
+        let response = vec![
+            "HTTP/1.1 200 Ok",
+            "ows: https://tools.ietf.org/html/rfc7230",
+            "\t#section-3.2.4",
+            "Content-Length: 12",
+            "",
+            "Hello World!",
+        ];
         let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
@@ -180,18 +201,23 @@ mod tests {
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
         assert_eq!(response.status_line(), "200 Ok");
-        let headers: &[&str] = &["ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
-                                 "Content-Length: 12"];
+        let headers: &[&str] = &[
+            "ows: https://tools.ietf.org/html/rfc7230 #section-3.2.4",
+            "Content-Length: 12",
+        ];
         assert_eq!(response.headers(), headers);
-        assert_eq!(response.body_as_string().unwrap(),
-                   "Hello World!".to_owned());
-
+        assert_eq!(
+            response.body_as_string().unwrap(),
+            "Hello World!".to_owned()
+        );
     }
 
     #[test]
     fn test_build_http_no_response_body() {
-        let response = vec!["HTTP/1.1 302 Moved",
-                            "Location: https://tools.ietf.org/html/rfc7230#section-3.3"];
+        let response = vec![
+            "HTTP/1.1 302 Moved",
+            "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
+        ];
         let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
