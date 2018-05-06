@@ -27,6 +27,7 @@ use super::constants;
 /// Request is build using [RequestBuilder](../request/struct.RequestBuilder.html)
 /// and them consume by the [Client](../client/struct.Client.html)
 /// to perform the query.
+#[derive(Default)]
 pub struct Request {
     host: String,
     port: u16,
@@ -54,16 +55,16 @@ impl Request {
         body: Option<Vec<u8>>,
     ) -> Request {
         Request {
-            host: host,
-            port: port,
-            authority: authority,
-            is_domain: is_domain,
-            scheme: scheme,
-            http_method: http_method,
-            request_uri: request_uri,
-            http_version: http_version,
-            headers: headers,
-            body: body,
+            host,
+            port,
+            authority,
+            is_domain,
+            scheme,
+            http_method,
+            request_uri,
+            http_version,
+            headers,
+            body,
         }
     }
 
@@ -199,8 +200,8 @@ impl RequestBuilder {
         let url = url.parse::<Url>();
         RequestBuilder {
             http_method: "GET".to_owned(),
+            url,
             user_agent: constants::USER_AGENT.to_string(),
-            url: url,
             http_version: "HTTP/1.1".to_owned(),
             headers: Vec::new(),
             body: None,
@@ -261,8 +262,7 @@ impl RequestBuilder {
 
     /// Set a body to send in the query. By default a query has no body.
     pub fn set_body_as_str(self, body: &str) -> Self {
-        let moved = self.set_body(body.as_bytes());
-        moved
+        self.set_body(body.as_bytes())
     }
 
     /// Construct the [Request](../request/struct.Request.html).
@@ -276,7 +276,7 @@ impl RequestBuilder {
     ///
     pub fn build(&self) -> CabotResult<Request> {
         if let Err(ref err) = self.url {
-            return Err(CabotError::UrlParseError(err.clone()));
+            return Err(CabotError::UrlParseError(*err));
         }
         let url = self.url.as_ref().unwrap().clone();
 
@@ -302,10 +302,7 @@ impl RequestBuilder {
             request_uri.push_str("?");
             request_uri.push_str(querystring);
         }
-        let mut is_domain = true;
-        if url.domain().is_none() {
-            is_domain = false;
-        }
+        let is_domain = url.domain().is_some();
 
         let mut headers = self.headers.clone();
         headers.push(format!("User-Agent: {}", self.user_agent));

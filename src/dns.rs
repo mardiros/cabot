@@ -12,7 +12,7 @@ pub struct Resolver {
 
 impl Resolver {
     pub fn new(verbose: bool) -> Self {
-        Resolver { verbose: verbose }
+        Resolver { verbose }
     }
     pub fn get_addr(&self, authority: &str) -> CabotResult<SocketAddr> {
         debug!("Resolving TCP Endpoint for authority {}", authority);

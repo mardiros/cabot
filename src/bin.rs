@@ -243,10 +243,7 @@ struct CabotBinWrite<'a> {
 
 impl<'a> CabotBinWrite<'a> {
     pub fn new(out: &'a mut Write, verbose: bool) -> Self {
-        CabotBinWrite {
-            out: out,
-            verbose: verbose,
-        }
+        CabotBinWrite { out, verbose }
     }
 }
 
@@ -256,7 +253,7 @@ impl<'a> Write for CabotBinWrite<'a> {
 
         // If there is headers and we logged them
         if response.len() == 2 && (log_enabled!(Info) || self.verbose) {
-            let headers = response.get(0).unwrap();
+            let headers = &response[0];
             let headers = String::from_utf8_lossy(headers);
             let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
             if log_enabled!(Info) {
@@ -271,7 +268,7 @@ impl<'a> Write for CabotBinWrite<'a> {
         }
 
         let body = if response.len() == 2 {
-            let start = response.get(0).unwrap().len() + 4;
+            let start = &response[0].len() + 4;
             &buf[start..]
         } else {
             &buf[..]

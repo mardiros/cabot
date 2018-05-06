@@ -12,6 +12,7 @@ use super::results::CabotResult;
 use super::constants;
 
 /// Perform the http query
+#[derive(Default)]
 pub struct Client {
     verbose: bool,
     authorities: HashMap<String, SocketAddr>,
@@ -62,8 +63,8 @@ impl Write for CabotLibWrite {
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         info!("Parsing http response");
         let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
-        let header_len = response.get(0).unwrap().len();
-        let headers_str = String::from_utf8_lossy(response.get(0).unwrap());
+        let header_len = &response[0].len();
+        let headers_str = String::from_utf8_lossy(&response[0]);
         let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers_str).collect();
 
         let mut builder = ResponseBuilder::new();
@@ -84,7 +85,7 @@ impl Write for CabotLibWrite {
                         break;
                     }
                     let buf = buf.unwrap();
-                    if buf.starts_with(" ") || buf.starts_with("\t") {
+                    if buf.starts_with(' ') || buf.starts_with('\t') {
                         debug!("Obsolete line folded header reveived in {}", header);
                         header.push_str(" ");
                         header.push_str(buf.trim_left());

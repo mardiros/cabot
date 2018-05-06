@@ -43,11 +43,11 @@ impl Response {
         body: Option<Vec<u8>>,
     ) -> Response {
         Response {
-            http_version: http_version,
-            status_code: status_code,
-            status_line: status_line,
-            headers: headers,
-            body: body,
+            http_version,
+            status_code,
+            status_line,
+            headers,
+            body,
         }
     }
 
@@ -117,7 +117,7 @@ impl Response {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// An internal class used to build response.
 ///
 ///
@@ -166,7 +166,7 @@ impl ResponseBuilder {
         }
 
         let status_line = self.status_line.as_ref().unwrap();
-        let mut vec_status_line: Vec<&str> = status_line.splitn(3, " ").collect();
+        let mut vec_status_line: Vec<&str> = status_line.splitn(3, ' ').collect();
 
         if vec_status_line.len() != 3 {
             return Err(CabotError::HttpResponseParseError(format!(
@@ -184,7 +184,7 @@ impl ResponseBuilder {
             )));
         }
 
-        let status_code = vec_status_line.get(0).unwrap();
+        let status_code = &vec_status_line[0];
         let status_code: Result<usize, ParseIntError> = status_code.parse();
         if status_code.is_err() {
             return Err(CabotError::HttpResponseParseError(format!(

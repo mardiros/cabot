@@ -24,10 +24,10 @@ fn log_request(request: &[u8], verbose: bool) {
         return;
     }
     let request: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(request, 2).collect();
-    let headers = String::from_utf8_lossy(request.get(0).unwrap());
+    let headers = String::from_utf8_lossy(&request[0]);
     let headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
     let bodylen = if request.len() == 2 {
-        let body = request.get(1).unwrap();
+        let body = &request[1];
         body.len()
     } else {
         0
@@ -56,16 +56,11 @@ where
     T: Read + Sized,
 {
     let mut response: Vec<u8> = Vec::with_capacity(RESPONSE_BUFFER_SIZE);
-    loop {
-        match client.read(&mut buf[..]) {
-            Ok(count) => {
-                if count > 0 {
-                    response.extend_from_slice(&buf[0..count]);
-                } else {
-                    break;
-                }
-            }
-            Err(_) => break, // connection is closed by client
+    while let Ok(count) = client.read(&mut buf[..]) {
+        if count > 0 {
+            response.extend_from_slice(&buf[0..count]);
+        } else {
+            break;
         }
     }
     response
@@ -82,7 +77,7 @@ fn from_http(
     log_request(&raw_request, verbose);
 
     debug!("Sending request...");
-    client.write(&raw_request).unwrap();
+    client.write_all(&raw_request).unwrap();
     let mut buf = [0; BUFFER_PAGE_SIZE];
     let response = read_buf(client, &mut buf);
     out.write_all(response.as_slice()).unwrap();
@@ -196,7 +191,7 @@ pub fn http_query(
     let addr = match authorities.get(authority) {
         Some(val) => {
             info!("Fetch authority {} using autorities map", authority);
-            val.clone()
+            *val
         }
         None => {
             info!("Fetch authority {} using resolver", authority);
