@@ -201,11 +201,9 @@ pub fn http_query(
     };
 
     info!("Connecting to {}", addr);
-    let client = TcpStream::connect(addr);
-    if client.is_err() {
-        return Err(CabotError::IOError(format!("{}", client.unwrap_err())));
-    }
-    let mut client = client.unwrap();
+    let mut client =
+        TcpStream::connect(addr).map_err(|err| CabotError::IOError(format!("{}", err)))?;
+
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
     match request.scheme() {

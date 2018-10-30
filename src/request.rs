@@ -96,14 +96,9 @@ impl Request {
             Some(ref body) => {
                 let mut body_vec: Vec<u8> = Vec::new();
                 body_vec.extend_from_slice(body);
-                let body_str = String::from_utf8(body_vec);
-                if body_str.is_err() {
-                    return Err(CabotError::EncodingError(format!(
-                        "Cannot decode utf8: {}",
-                        body_str.unwrap_err()
-                    )));
-                }
-                body_str.unwrap()
+                String::from_utf8(body_vec).map_err(|err| {
+                    CabotError::EncodingError(format!("Cannot decode utf8: {}", err))
+                })?
             }
         };
         Ok(Some(body))

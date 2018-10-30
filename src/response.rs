@@ -20,8 +20,6 @@
 //! assert_eq!(response.body_as_string().unwrap(), "{}");
 //! ```
 
-use std::num::ParseIntError;
-
 use super::results::{CabotError, CabotResult};
 
 /// Represent the parsed HTTP response.
@@ -103,14 +101,9 @@ impl Response {
             Some(ref body) => {
                 let mut body_vec: Vec<u8> = Vec::new();
                 body_vec.extend_from_slice(body);
-                let body_str = String::from_utf8(body_vec);
-                if body_str.is_err() {
-                    return Err(CabotError::EncodingError(format!(
-                        "Cannot decode utf8: {}",
-                        body_str.unwrap_err()
-                    )));
-                }
-                body_str.unwrap()
+                String::from_utf8(body_vec).map_err(|err| {
+                    CabotError::EncodingError(format!("Cannot decode utf8: {}", err))
+                })?
             }
         };
         Ok(body)
@@ -185,14 +178,9 @@ impl ResponseBuilder {
         }
 
         let status_code = &vec_status_line[0];
-        let status_code: Result<usize, ParseIntError> = status_code.parse();
-        if status_code.is_err() {
-            return Err(CabotError::HttpResponseParseError(format!(
-                "Malformed status code: {}",
-                status_line
-            )));
-        }
-        let status_code = status_code.unwrap();
+        let status_code = status_code.parse().map_err(|_| {
+            CabotError::HttpResponseParseError(format!("Malformed status code: {}", status_line))
+        })?;
         let status_line = vec_status_line.as_slice().join(" ");
 
         Ok(Response::new(
