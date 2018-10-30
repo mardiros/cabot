@@ -1,8 +1,8 @@
 //! DNS Resolution
 
+use log::LogLevel::Info;
 use std::io::{stderr, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
-use log::LogLevel::Info;
 
 use super::results::{CabotError, CabotResult};
 

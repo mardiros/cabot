@@ -1,15 +1,15 @@
 //! The HTTP Client that perform query
 
-use std::io::{self, Write};
-use std::fmt::Arguments;
 use std::collections::HashMap;
+use std::fmt::Arguments;
+use std::io::{self, Write};
 use std::net::SocketAddr;
 
-use super::request::Request;
+use super::constants;
 use super::http;
+use super::request::Request;
 use super::response::{Response, ResponseBuilder};
 use super::results::CabotResult;
-use super::constants;
 
 /// Perform the http query
 #[derive(Default)]

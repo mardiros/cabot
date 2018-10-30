@@ -6,10 +6,10 @@ extern crate pretty_env_logger;
 extern crate cabot;
 extern crate clap;
 
+use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::fs::OpenOptions;
 use std::io::{self, stderr, Write};
-use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::net::{AddrParseError, SocketAddr};
 
@@ -17,10 +17,10 @@ use log::LogLevel::Info;
 
 use clap::{App, Arg};
 
-use cabot::results::{CabotError, CabotResult};
+use cabot::constants;
 use cabot::http;
 use cabot::request::RequestBuilder;
-use cabot::constants;
+use cabot::results::{CabotError, CabotResult};
 
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
@@ -32,57 +32,49 @@ pub fn run() -> CabotResult<()> {
                 .index(1)
                 .required(true)
                 .help("URL to request"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("REQUEST")
                 .short("X")
                 .long("request")
                 .default_value("GET")
                 .help("Specify request command to use"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("HEADER")
                 .short("H")
                 .long("header")
                 .takes_value(true)
                 .multiple(true)
                 .help("Pass custom header to server"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("FILE")
                 .short("o")
                 .long("output")
                 .takes_value(true)
                 .help("Write to FILE instead of stdout"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("VERBOSE")
                 .short("v")
                 .long("verbose")
                 .help("Make the operation more talkative"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("BODY")
                 .short("d")
                 .long("data")
                 .takes_value(true)
                 .help("Post Data (Using utf-8 encoding)"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("UA")
                 .short("A")
                 .long("user-agent")
                 .default_value(constants::USER_AGENT)
                 .help("Post Data (Using utf-8 encoding)"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
                 .multiple(true)
                 .help("<host:port:address> Resolve the host+port to this address"),
-        )
-        .get_matches();
+        ).get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
@@ -111,15 +103,13 @@ pub fn run() -> CabotResult<()> {
                         std::process::exit(1);
                     }
                     resolv
-                })
-                .map(|mut resolv| {
+                }).map(|mut resolv| {
                     (
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                     )
-                })
-                .map(|(host, port, addr)| {
+                }).map(|(host, port, addr)| {
                     let parsed_port = port.parse::<usize>();
                     if parsed_port.is_err() {
                         let _ = writeln!(

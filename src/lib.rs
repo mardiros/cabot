@@ -54,12 +54,12 @@ extern crate webpki_roots;
 
 mod dns;
 
+pub mod client;
 pub mod constants;
 pub mod http;
-pub mod results;
 pub mod request;
-pub mod client;
 pub mod response;
+pub mod results;
 
 // Rexport
 pub use client::Client;

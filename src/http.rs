@@ -1,20 +1,20 @@
 //! Low level and internal http and https implementation.
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::collections::HashMap;
 use std::io::{stderr, Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
+use log::LogLevel::Info;
 use rustls::{ClientConfig, ClientSession, ProtocolVersion, Session};
 use webpki::DNSNameRef;
 use webpki_roots;
-use log::LogLevel::Info;
 
+use super::constants;
+use super::dns::Resolver;
 use super::request::Request;
 use super::results::{CabotError, CabotResult};
-use super::dns::Resolver;
-use super::constants;
 
 const BUFFER_PAGE_SIZE: usize = 1024;
 const RESPONSE_BUFFER_SIZE: usize = 1024;

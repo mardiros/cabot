@@ -2,8 +2,8 @@
 //!
 //! [see whats inside](../../src/cabot/constants.rs.html).
 
-use regex::Regex;
 use regex::bytes::Regex as BytesRegex;
+use regex::Regex;
 
 /// Version of cabot
 pub const VERSION: &str = "0.2.0";

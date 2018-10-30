@@ -19,8 +19,8 @@
 
 use url::{self, Url};
 
-use super::results::{CabotError, CabotResult};
 use super::constants;
+use super::results::{CabotError, CabotResult};
 
 /// An HTTP Request representation.
 ///
@@ -327,8 +327,8 @@ impl RequestBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::constants;
+    use super::*;
 
     #[test]
     fn test_get_request_to_string() {
