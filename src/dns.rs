@@ -18,7 +18,7 @@ impl Resolver {
         debug!("Resolving TCP Endpoint for authority {}", authority);
         let mut addrs = authority
             .to_socket_addrs()
-            .map_err(|err| CabotError::DNSLookupError(format!("{}", err)))?;
+            .map_err(|err| CabotError::IOError(err))?;
         let addr = addrs.next(); // get first item from iterator
         if addr.is_none() {
             return Err(CabotError::DNSLookupError(

@@ -20,7 +20,7 @@ use clap::{App, Arg};
 use cabot::constants;
 use cabot::http;
 use cabot::request::RequestBuilder;
-use cabot::results::{CabotError, CabotResult};
+use cabot::results::CabotResult;
 
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")

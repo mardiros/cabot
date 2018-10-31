@@ -1,13 +1,14 @@
 //! Define results and error. `Result<T, CabotError>`
 use std::error::Error;
 use std::fmt::{self, Display};
+use std::io::{Error as IOError};
 
 use url;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 /// Errors in cabot
 pub enum CabotError {
-    IOError(String),
+    IOError(IOError),
     DNSLookupError(String),
     CertificateError(String),
     SchemeError(String),
@@ -34,7 +35,7 @@ impl Display for CabotError {
                 format!("URL Parse Error: {}", err)
             }
             CabotError::IOError(err) => {
-                format!("IOError: {}", err)
+                format!("IOError: {:?}", err)
             }
             CabotError::DNSLookupError(err) => {
                 format!("DNSLookupError: {}", err)

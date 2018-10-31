@@ -151,7 +151,7 @@ fn from_https(
             let count = tlsclient.read_tls(&mut client);
             if let Err(err) = count {
                 error!("{:?}", err);
-                return Err(CabotError::IOError(format!("{}", err)));
+                return Err(CabotError::IOError(err));
             }
 
             let count = count.unwrap();
@@ -202,7 +202,7 @@ pub fn http_query(
 
     info!("Connecting to {}", addr);
     let mut client =
-        TcpStream::connect(addr).map_err(|err| CabotError::IOError(format!("{}", err)))?;
+        TcpStream::connect(addr).map_err(|err| CabotError::IOError(err))?;
 
     client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
