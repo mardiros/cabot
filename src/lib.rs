@@ -56,11 +56,11 @@ mod dns;
 
 pub mod client;
 pub mod constants;
+pub mod errors;
 pub mod http;
 pub mod request;
 pub mod response;
 pub mod results;
-pub mod errors;
 
 // Rexport
 pub use client::Client;
