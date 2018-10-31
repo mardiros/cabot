@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fmt::{self, Display};
 use std::io::{Error as IOError};
 
+use rustls::TLSError;
 use url;
 
 #[derive(Debug)]
@@ -10,7 +11,7 @@ use url;
 pub enum CabotError {
     IOError(IOError),
     DNSLookupError(String),
-    CertificateError(String),
+    CertificateError(TLSError),
     SchemeError(String),
     HostnameParseError(String),
     OpaqueUrlError(String),
