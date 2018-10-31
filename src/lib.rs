@@ -60,6 +60,7 @@ pub mod http;
 pub mod request;
 pub mod response;
 pub mod results;
+pub mod errors;
 
 // Rexport
 pub use client::Client;
