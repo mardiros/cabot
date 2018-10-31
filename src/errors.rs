@@ -2,6 +2,7 @@
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::io::Error as IOError;
+use std::string::FromUtf8Error;
 
 use rustls::TLSError;
 use url;
@@ -17,7 +18,7 @@ pub enum CabotError {
     OpaqueUrlError(String),
     UrlParseError(url::ParseError),
     HttpResponseParseError(String),
-    EncodingError(String),
+    EncodingError(FromUtf8Error),
 }
 
 impl Display for CabotError {
@@ -32,7 +33,7 @@ impl Display for CabotError {
             CabotError::CertificateError(err) => format!("CertificateError: {}", err),
             // Unexpexcted Error, not used
             CabotError::HttpResponseParseError(_) => format!("Unexpected error"),
-            CabotError::EncodingError(err) => format!("EncodingError error: {}", err),
+            CabotError::EncodingError(err) => format!("Cannot decode utf8: {}", err),
         };
         write!(f, "{:?}: {}", self, description)
     }
