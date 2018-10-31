@@ -24,16 +24,16 @@ pub enum CabotError {
 impl Display for CabotError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let description = match self {
-            CabotError::SchemeError(scheme) => format!("Unmanaged scheme: {}", scheme),
-            CabotError::OpaqueUrlError(err) => format!("Opaque URL Error: {}", err),
-            CabotError::HostnameParseError(name) => format!("Invalid hostname: {}", name),
+            CabotError::SchemeError(scheme) => format!("Unmanaged Scheme: {}", scheme),
+            CabotError::OpaqueUrlError(url) => format!("Opaque URL Error: {}", url),
+            CabotError::HostnameParseError(name) => format!("Invalid Hostname: {}", name),
             CabotError::UrlParseError(err) => format!("URL Parse Error: {}", err),
-            CabotError::IOError(err) => format!("IOError: {:?}", err),
-            CabotError::DNSLookupError(err) => format!("DNSLookupError: {}", err),
-            CabotError::CertificateError(err) => format!("CertificateError: {}", err),
+            CabotError::IOError(err) => format!("IO Error: {:?}", err),
+            CabotError::DNSLookupError(err) => format!("DNS Lookup Error: {}", err),
+            CabotError::CertificateError(err) => format!("Certificate Error: {}", err),
             // Unexpexcted Error, not used
-            CabotError::HttpResponseParseError(_) => format!("Unexpected error"),
-            CabotError::EncodingError(err) => format!("Cannot decode utf8: {}", err),
+            CabotError::HttpResponseParseError(err) => format!("HTTP Response Parse Error: {}", err),
+            CabotError::EncodingError(err) => format!("Utf8 Encoding Error: {}", err),
         };
         write!(f, "{:?}: {}", self, description)
     }
