@@ -41,6 +41,13 @@ impl Display for CabotError {
 
 impl Error for CabotError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
+        let err: Option<&(dyn Error + 'static)> = match self {
+            CabotError::UrlParseError(err) => Some(err),
+            CabotError::IOError(err) => Some(err),
+            CabotError::CertificateError(err) => Some(err),
+            CabotError::EncodingError(err) => Some(err),
+            _ => None
+        };
+        err
     }
 }
