@@ -100,11 +100,9 @@ fn from_https(
         .root_store
         .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
     let rc_config = Arc::new(config);
-    let host = DNSNameRef::try_from_ascii_str(request.host());
-    if host.is_err() {
-        return Err(CabotError::HostnameParseError(request.host().to_owned()));
-    }
-    let mut tlsclient = ClientSession::new(&rc_config, host.unwrap());
+    let host = DNSNameRef::try_from_ascii_str(request.host())
+        .map_err(|_| CabotError::HostnameParseError(request.host().to_owned()))?;
+    let mut tlsclient = ClientSession::new(&rc_config, host);
     let mut is_handshaking = true;
     loop {
         while tlsclient.wants_write() {
