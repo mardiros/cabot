@@ -169,6 +169,8 @@ pub fn http_query(
     mut out: &mut Write,
     authorities: &HashMap<String, SocketAddr>,
     verbose: bool,
+    ipv4: bool,
+    ipv6: bool,
 ) -> CabotResult<()> {
     debug!(
         "HTTP Query {} {}",
@@ -186,7 +188,7 @@ pub fn http_query(
         None => {
             info!("Fetch authority {} using resolver", authority);
             let resolver = Resolver::new(verbose);
-            resolver.get_addr(authority)?
+            resolver.get_addr(authority, ipv4, ipv6)?
         }
     };
 

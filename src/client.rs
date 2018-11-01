@@ -38,7 +38,7 @@ impl Client {
     /// return the associate [Response](../response/struct.Response.html).
     pub fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
-        http::http_query(&request, &mut out, &self.authorities, self.verbose)?;
+        http::http_query(&request, &mut out, &self.authorities, self.verbose, true, true)?;
         out.response()
     }
 }
