@@ -269,7 +269,7 @@ impl RequestBuilder {
     ///   - CabotError::OpaqueUrlError in case the `url` is parsed but miss informations such as hostname.
     ///
     pub fn build(&self) -> CabotResult<Request> {
-        let url = self.url.as_ref().map_err(|err|CabotError::UrlParseError(*err))?;
+        let url = self.url.as_ref().map_err(|err|*err)?;
 
         let host = url.host_str();
         if host.is_none() {

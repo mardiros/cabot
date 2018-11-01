@@ -5,18 +5,18 @@ use std::io::Error as IOError;
 use std::string::FromUtf8Error;
 
 use rustls::TLSError;
-use url;
+use url::ParseError as UrlParseError;
 
 #[derive(Debug)]
 /// Errors in cabot
 pub enum CabotError {
     IOError(IOError),
-    DNSLookupError(String),
     CertificateError(TLSError),
+    UrlParseError(UrlParseError),
+    DNSLookupError(String),
     SchemeError(String),
     HostnameParseError(String),
     OpaqueUrlError(String),
-    UrlParseError(url::ParseError),
     HttpResponseParseError(String),
     EncodingError(FromUtf8Error),
 }
@@ -61,5 +61,11 @@ impl From<IOError> for CabotError {
 impl From<TLSError> for CabotError {
     fn from(err: TLSError) -> CabotError {
         CabotError::CertificateError(err)
+    }
+}
+
+impl From<UrlParseError> for CabotError {
+    fn from(err: UrlParseError) -> CabotError {
+        CabotError::UrlParseError(err)
     }
 }
