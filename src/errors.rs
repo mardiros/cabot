@@ -69,3 +69,9 @@ impl From<UrlParseError> for CabotError {
         CabotError::UrlParseError(err)
     }
 }
+
+impl From<FromUtf8Error> for CabotError {
+    fn from(err: FromUtf8Error) -> CabotError {
+        CabotError::EncodingError(err)
+    }
+}
