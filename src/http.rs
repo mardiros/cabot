@@ -152,9 +152,7 @@ fn from_https(
                 break;
             }
 
-            if let Err(err) = tlsclient.process_new_packets() {
-                return Err(CabotError::CertificateError(err));
-            }
+            tlsclient.process_new_packets()?;
 
             let mut part: Vec<u8> = read_buf(&mut tlsclient, &mut buf);
             response.append(&mut part);

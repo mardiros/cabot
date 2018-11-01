@@ -57,3 +57,9 @@ impl From<IOError> for CabotError {
         CabotError::IOError(err)
     }
 }
+
+impl From<TLSError> for CabotError {
+    fn from(err: TLSError) -> CabotError {
+        CabotError::CertificateError(err)
+    }
+}
