@@ -27,7 +27,9 @@ impl Display for CabotError {
         let description = match self {
             CabotError::DNSLookupError(err) => format!("DNS Lookup Error: {}", err),
             CabotError::HostnameParseError(name) => format!("Invalid Hostname: {}", name),
-            CabotError::HttpResponseParseError(err) => format!("HTTP Response Parse Error: {}", err),
+            CabotError::HttpResponseParseError(err) => {
+                format!("HTTP Response Parse Error: {}", err)
+            }
             CabotError::OpaqueUrlError(url) => format!("Opaque URL Error: {}", url),
             CabotError::SchemeError(scheme) => format!("Unmanaged Scheme: {}", scheme),
             // Wrapped errors
@@ -47,7 +49,7 @@ impl Error for CabotError {
             CabotError::EncodingError(err) => Some(err),
             CabotError::IOError(err) => Some(err),
             CabotError::UrlParseError(err) => Some(err),
-            _ => None
+            _ => None,
         };
         err
     }

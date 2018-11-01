@@ -50,8 +50,13 @@ impl Client {
     pub fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
         http::http_query(
-            &request, &mut out, &self.authorities, self.verbose,
-            self.ipv4, self.ipv6)?;
+            &request,
+            &mut out,
+            &self.authorities,
+            self.verbose,
+            self.ipv4,
+            self.ipv6,
+        )?;
         out.response()
     }
 }
