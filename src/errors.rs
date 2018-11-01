@@ -28,14 +28,14 @@ impl Display for CabotError {
             CabotError::OpaqueUrlError(url) => format!("Opaque URL Error: {}", url),
             CabotError::HostnameParseError(name) => format!("Invalid Hostname: {}", name),
             CabotError::UrlParseError(err) => format!("URL Parse Error: {}", err),
-            CabotError::IOError(err) => format!("IO Error: {:?}", err),
+            CabotError::IOError(err) => format!("IO Error: {}", err),
             CabotError::DNSLookupError(err) => format!("DNS Lookup Error: {}", err),
             CabotError::CertificateError(err) => format!("Certificate Error: {}", err),
             // Unexpexcted Error, not used
             CabotError::HttpResponseParseError(err) => format!("HTTP Response Parse Error: {}", err),
             CabotError::EncodingError(err) => format!("Utf8 Encoding Error: {}", err),
         };
-        write!(f, "{:?}: {}", self, description)
+        write!(f, "{}", description)
     }
 }
 
