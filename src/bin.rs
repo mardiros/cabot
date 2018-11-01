@@ -20,7 +20,7 @@ use clap::{App, Arg};
 use cabot::constants;
 use cabot::http;
 use cabot::request::RequestBuilder;
-use cabot::results::{CabotError, CabotResult};
+use cabot::results::CabotResult;
 
 pub fn run() -> CabotResult<()> {
     let matches = App::new("cabot")
@@ -183,42 +183,8 @@ fn main() {
         Ok(()) => {
             debug!("Command cabot ended succesfully");
         }
-        Err(CabotError::SchemeError(scheme)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Unamanaged scheme: {}", scheme);
-            std::process::exit(1);
-        }
-        Err(CabotError::OpaqueUrlError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Opaque URL Error: {}", err);
-            std::process::exit(1);
-        }
-
-        Err(CabotError::HostnameParseError(name)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Invalid hostname: {}", name);
-            std::process::exit(1);
-        }
-        Err(CabotError::UrlParseError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "URL Parse Error: {}", err);
-            std::process::exit(1);
-        }
-        Err(CabotError::IOError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "IOError: {}", err);
-            std::process::exit(1);
-        }
-        Err(CabotError::DNSLookupError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "DNSLookupError: {}", err);
-            std::process::exit(1);
-        }
-        Err(CabotError::CertificateError(err)) => {
-            let _ = writeln!(&mut std::io::stderr(), "CertificateError: {}", err);
-            std::process::exit(1);
-        }
-        // Unexpexcted Error, not used
-        Err(CabotError::HttpResponseParseError(_)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Unexpected error");
-            std::process::exit(1);
-        }
-        Err(CabotError::EncodingError(_)) => {
-            let _ = writeln!(&mut std::io::stderr(), "Unexpected error");
+        Err(err) => {
+            let _ = writeln!(&mut std::io::stderr(), "{}", err);
             std::process::exit(1);
         }
     }

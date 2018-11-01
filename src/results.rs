@@ -1,20 +1,4 @@
-//! Define results and error. `Result<T, CabotError>`
-
-use url;
-
-#[derive(Debug, Clone)]
-/// Errors in cabot
-pub enum CabotError {
-    IOError(String),
-    DNSLookupError(String),
-    CertificateError(String),
-    SchemeError(String),
-    HostnameParseError(String),
-    OpaqueUrlError(String),
-    UrlParseError(url::ParseError),
-    HttpResponseParseError(String),
-    EncodingError(String),
-}
+pub use super::errors::CabotError;
 
 /// Result used by method that can failed.
 pub type CabotResult<T> = Result<T, CabotError>;

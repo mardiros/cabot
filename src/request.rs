@@ -96,9 +96,7 @@ impl Request {
             Some(ref body) => {
                 let mut body_vec: Vec<u8> = Vec::new();
                 body_vec.extend_from_slice(body);
-                String::from_utf8(body_vec).map_err(|err| {
-                    CabotError::EncodingError(format!("Cannot decode utf8: {}", err))
-                })?
+                String::from_utf8(body_vec)?
             }
         };
         Ok(Some(body))
@@ -270,10 +268,7 @@ impl RequestBuilder {
     ///   - CabotError::OpaqueUrlError in case the `url` is parsed but miss informations such as hostname.
     ///
     pub fn build(&self) -> CabotResult<Request> {
-        if let Err(ref err) = self.url {
-            return Err(CabotError::UrlParseError(*err));
-        }
-        let url = self.url.as_ref().unwrap().clone();
+        let url = self.url.as_ref().map_err(|err|*err)?;
 
         let host = url.host_str();
         if host.is_none() {
