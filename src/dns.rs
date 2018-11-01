@@ -16,9 +16,7 @@ impl Resolver {
     }
     pub fn get_addr(&self, authority: &str) -> CabotResult<SocketAddr> {
         debug!("Resolving TCP Endpoint for authority {}", authority);
-        let mut addrs = authority
-            .to_socket_addrs()
-            .map_err(|err| CabotError::IOError(err))?;
+        let mut addrs = authority.to_socket_addrs()?;
         let addr = addrs.next(); // get first item from iterator
         if addr.is_none() {
             return Err(CabotError::DNSLookupError(

@@ -51,3 +51,9 @@ impl Error for CabotError {
         err
     }
 }
+
+impl From<IOError> for CabotError {
+    fn from(err: IOError) -> CabotError {
+        CabotError::IOError(err)
+    }
+}
