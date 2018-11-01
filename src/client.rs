@@ -15,6 +15,8 @@ use super::results::CabotResult;
 #[derive(Default)]
 pub struct Client {
     verbose: bool,
+    ipv4: bool,
+    ipv6: bool,
     authorities: HashMap<String, SocketAddr>,
 }
 
@@ -23,8 +25,17 @@ impl Client {
     pub fn new() -> Self {
         Client {
             verbose: false,
+            ipv4: true,
+            ipv6: true,
             authorities: HashMap::new(),
         }
+    }
+
+    /// Set Address Type authorized for DNS resolution.
+    /// If every version is set to false, the resolution will failed.
+    pub fn set_ip_version(&mut self, ipv4: bool, ipv6: bool) {
+        self.ipv4 = ipv4;
+        self.ipv6 = ipv6;
     }
 
     /// Avoid DNS resolution, force an address to be resolve to a given endpoint.
@@ -38,7 +49,9 @@ impl Client {
     /// return the associate [Response](../response/struct.Response.html).
     pub fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
-        http::http_query(&request, &mut out, &self.authorities, self.verbose)?;
+        http::http_query(
+            &request, &mut out, &self.authorities, self.verbose,
+            self.ipv4, self.ipv6)?;
         out.response()
     }
 }
@@ -231,4 +244,5 @@ mod tests {
         assert_eq!(response.headers(), headers);
         assert_eq!(response.body_as_string().unwrap(), "");
     }
+
 }

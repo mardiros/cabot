@@ -14,10 +14,10 @@ impl Resolver {
     pub fn new(verbose: bool) -> Self {
         Resolver { verbose }
     }
-    pub fn get_addr(&self, authority: &str) -> CabotResult<SocketAddr> {
+    pub fn get_addr(&self, authority: &str, ipv4: bool, ipv6: bool) -> CabotResult<SocketAddr> {
         debug!("Resolving TCP Endpoint for authority {}", authority);
-        let mut addrs = authority.to_socket_addrs()?;
-        let addr = addrs.next(); // get first item from iterator
+        let addrs = authority.to_socket_addrs()?;
+        let addr = addrs.filter(|addr| (ipv4 && addr.is_ipv4()) || (ipv6 && addr.is_ipv6())).next();
         if addr.is_none() {
             return Err(CabotError::DNSLookupError(
                 "Host does not exists".to_owned(),

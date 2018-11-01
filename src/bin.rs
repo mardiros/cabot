@@ -63,6 +63,16 @@ pub fn run() -> CabotResult<()> {
                 .takes_value(true)
                 .help("Post Data (Using utf-8 encoding)"),
         ).arg(
+            Arg::with_name("IPv4")
+                .short("4")
+                .long("ipv4")
+                .help("Resolve host names to IPv4 addresses"),
+        ).arg(
+            Arg::with_name("IPv6")
+                .short("6")
+                .long("ipv6")
+                .help("Resolve host names to IPv6 addresses"),
+        ).arg(
             Arg::with_name("UA")
                 .short("A")
                 .long("user-agent")
@@ -81,6 +91,13 @@ pub fn run() -> CabotResult<()> {
     let verbose = matches.is_present("VERBOSE");
     let body = matches.value_of("BODY");
     let ua = matches.value_of("UA").unwrap();
+
+    let mut ipv4 = matches.is_present("IPv4");
+    let mut ipv6 = matches.is_present("IPv6");
+    if !ipv4 && !ipv6 {
+        ipv4 = true;
+        ipv6 = true;
+    }
 
     let headers: Vec<&str> = match matches.values_of("HEADER") {
         Some(headers) => headers.collect(),
@@ -163,6 +180,8 @@ pub fn run() -> CabotResult<()> {
             &mut CabotBinWrite::new(&mut f, verbose),
             &resolved,
             verbose,
+            ipv4,
+            ipv6,
         )?;
     } else {
         http::http_query(
@@ -170,6 +189,8 @@ pub fn run() -> CabotResult<()> {
             &mut CabotBinWrite::new(&mut io::stdout(), verbose),
             &resolved,
             verbose,
+            ipv4,
+            ipv6,
         )?;
     };
 
