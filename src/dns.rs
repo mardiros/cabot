@@ -19,13 +19,9 @@ impl Resolver {
         let addrs = authority.to_socket_addrs()?;
         let addr = addrs
             .filter(|addr| (ipv4 && addr.is_ipv4()) || (ipv6 && addr.is_ipv6()))
-            .next();
-        if addr.is_none() {
-            return Err(CabotError::DNSLookupError(
-                "Host does not exists".to_owned(),
-            ));
-        }
-        let addr = addr.unwrap();
+            .next().ok_or(
+                CabotError::DNSLookupError("Host does not exists".to_owned())
+            )?;
         if log_enabled!(Info) {
             info!("Authority {} has been resolved to {}", authority, addr);
         } else if self.verbose {

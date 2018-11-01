@@ -270,21 +270,13 @@ impl RequestBuilder {
     pub fn build(&self) -> CabotResult<Request> {
         let url = self.url.as_ref().map_err(|err| *err)?;
 
-        let host = url.host_str();
-        if host.is_none() {
-            return Err(CabotError::OpaqueUrlError(
-                "Unable to find host".to_string(),
-            ));
-        }
-        let host = host.unwrap();
+        let host = url.host_str().ok_or(
+            CabotError::OpaqueUrlError("Unable to find host".to_string())
+        )?;
 
-        let port = url.port_or_known_default();
-        if port.is_none() {
-            return Err(CabotError::OpaqueUrlError(
-                "Unable to determine a port".to_string(),
-            ));
-        }
-        let port = port.unwrap();
+        let port = url.port_or_known_default().ok_or(
+            CabotError::OpaqueUrlError("Unable to determine a port".to_string())
+        )?;
 
         let query = url.query();
         let mut request_uri = url.path().to_owned();

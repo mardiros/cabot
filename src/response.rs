@@ -150,13 +150,11 @@ impl ResponseBuilder {
 
     /// Build the Response with the initialized data.
     pub fn build(&self) -> CabotResult<Response> {
-        if self.status_line.is_none() {
-            return Err(CabotError::HttpResponseParseError(
-                "No Status Line".to_owned(),
-            ));
-        }
 
-        let status_line = self.status_line.as_ref().unwrap();
+        let status_line = self.status_line.as_ref().ok_or(
+            CabotError::HttpResponseParseError("No Status Line".to_owned())
+        )?;
+
         let mut vec_status_line: Vec<&str> = status_line.splitn(3, ' ').collect();
 
         if vec_status_line.len() != 3 {
