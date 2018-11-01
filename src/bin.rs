@@ -13,7 +13,7 @@ use std::io::{self, stderr, Write};
 use std::iter::FromIterator;
 use std::net::{AddrParseError, SocketAddr};
 
-use log::LogLevel::Info;
+use log::Level::Info;
 
 use clap::{App, Arg};
 
@@ -198,7 +198,7 @@ pub fn run() -> CabotResult<()> {
 }
 
 fn main() {
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
     debug!("Starting cabot");
     match run() {
         Ok(()) => {

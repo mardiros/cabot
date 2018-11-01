@@ -6,7 +6,7 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::LogLevel::Info;
+use log::Level::Info;
 use rustls::{ClientConfig, ClientSession, ProtocolVersion, Session};
 use webpki::DNSNameRef;
 use webpki_roots;
