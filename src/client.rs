@@ -106,7 +106,7 @@ impl Write for CabotLibWrite {
                     if buf.starts_with(' ') || buf.starts_with('\t') {
                         debug!("Obsolete line folded header reveived in {}", header);
                         header.push_str(" ");
-                        header.push_str(buf.trim_left());
+                        header.push_str(buf.trim_start());
                     } else {
                         debug!("Adding header {}", header);
                         builder = builder.add_header(header.as_str());
