@@ -23,10 +23,12 @@ use cabot::request::RequestBuilder;
 use cabot::results::CabotResult;
 
 pub fn run() -> CabotResult<()> {
-    let matches = App::new("cabot")
+
+    let user_agent: String = constants::user_agent();
+    let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
-        .author("Guillaume Gauvrit <guillaume@gauvr.it>")
-        .about("http(s) client")
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(
             Arg::with_name("URL")
                 .index(1)
@@ -76,8 +78,8 @@ pub fn run() -> CabotResult<()> {
             Arg::with_name("UA")
                 .short("A")
                 .long("user-agent")
-                .default_value(constants::USER_AGENT)
-                .help("Post Data (Using utf-8 encoding)"),
+                .default_value(user_agent.as_str())
+                .help("The user-agent HTTP header to use"),
         ).arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")

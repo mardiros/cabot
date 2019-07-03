@@ -6,24 +6,14 @@ use regex::bytes::Regex as BytesRegex;
 use regex::Regex;
 
 /// Version of cabot
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Default user agent `cabot/{cabot-version}`
-pub const USER_AGENT: &str = "cabot/0.2.0";
+pub fn user_agent() -> String {
+  format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+}
+
 
 lazy_static! {
     pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new("\r?\n\r?\n").unwrap();
     pub static ref SPLIT_HEADER_RE: Regex = Regex::new("\r?\n").unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn test_user_agent() {
-        let ua = format!("cabot/{}", VERSION);
-        assert_eq!(USER_AGENT, ua.as_str());
-    }
 }

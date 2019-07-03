@@ -194,7 +194,7 @@ impl RequestBuilder {
         RequestBuilder {
             http_method: "GET".to_owned(),
             url,
-            user_agent: constants::USER_AGENT.to_string(),
+            user_agent: constants::user_agent(),
             http_version: "HTTP/1.1".to_owned(),
             headers: Vec::new(),
             body: None,
@@ -402,7 +402,7 @@ mod tests {
         assert_eq!(request.body, None);
         assert_eq!(request.http_method(), "GET".to_string());
         assert_eq!(request.http_version(), "HTTP/1.1".to_string());
-        let headers: Vec<String> = vec![format!("User-Agent: {}", constants::USER_AGENT)];
+        let headers: Vec<String> = vec![format!("User-Agent: {}", constants::user_agent())];
         assert_eq!(request.headers, headers);
     }
 
