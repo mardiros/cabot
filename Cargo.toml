@@ -24,13 +24,13 @@ doc = false
 
 [dependencies]
 
-clap = "^2.32.0"
+clap = "^2.33.0"
 log = "^0.4.6"
-pretty_env_logger = "^0.2.5"
+pretty_env_logger = "^0.3.0"
 lazy_static = "^1.1.0"
 regex = "^1.0.5"
 
-rustls = "^0.14.0"
-webpki = "^0.18.1"
-webpki-roots = "^0.15.0"
+rustls = "^0.15.2"
+webpki = "^0.19.1"
+webpki-roots = "^0.16.0"
 url = "^1.7.0"
