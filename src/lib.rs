@@ -13,22 +13,20 @@
 //! ## Command Line:
 //!
 //! ```bash
-//! $ cabot https://www.rust-lang.org/en-US/ | head -n 10 | grep "description"
-//! <meta name="description" content="A systems programming language that runs
-//! blazingly fast, prevents segfaults, and guarantees thread safety.">
+//! $ cargo run https://www.rust-lang.org/ | head -n 20 | grep 'name="description"'
+//!     <meta name="description" content="A language empowering everyone to build reliable and efficient software.">
 //! ```
-//!
 //! ## Library:
 //!
 //! ```
 //! use cabot::{RequestBuilder, Client};
 //!
-//! let request = RequestBuilder::new("https://www.rust-lang.org/en-US/")
+//! let request = RequestBuilder::new("https://www.rust-lang.org/")
 //!     .build()
 //!     .unwrap();
 //! let client = Client::new();
 //! let response = client.execute(&request).unwrap();
-//! assert!(response.body_as_string().unwrap().contains("runs blazingly fast"));
+//! assert!(response.body_as_string().unwrap().contains("A language empowering everyone to build reliable and efficient software."));
 //!
 //! ```
 //!
