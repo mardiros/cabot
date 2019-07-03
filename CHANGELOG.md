@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## cabot 0.2.1 2019-07-03
+
+ * Upgrade dependencies.
+ * Use the (`env!` macro)[https://doc.rust-lang.org/1.2.0/std/macro.env!.html] to remove 
+   duplicated information (from cargo)[https://rurust.github.io/cargo-docs-ru/environment-variables.html#environment-variables-cargo-sets-for-crates].
+
 ## cabot 0.2.0 2018-03-16
 
  * Don't panic in case of network errors.
