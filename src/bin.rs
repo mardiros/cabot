@@ -23,7 +23,6 @@ use cabot::request::RequestBuilder;
 use cabot::results::CabotResult;
 
 pub fn run() -> CabotResult<()> {
-
     let user_agent: String = constants::user_agent();
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
@@ -34,59 +33,69 @@ pub fn run() -> CabotResult<()> {
                 .index(1)
                 .required(true)
                 .help("URL to request"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("REQUEST")
                 .short("X")
                 .long("request")
                 .default_value("GET")
                 .help("Specify request command to use"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("HEADER")
                 .short("H")
                 .long("header")
                 .takes_value(true)
                 .multiple(true)
                 .help("Pass custom header to server"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("FILE")
                 .short("o")
                 .long("output")
                 .takes_value(true)
                 .help("Write to FILE instead of stdout"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("VERBOSE")
                 .short("v")
                 .long("verbose")
                 .help("Make the operation more talkative"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("BODY")
                 .short("d")
                 .long("data")
                 .takes_value(true)
                 .help("Post Data (Using utf-8 encoding)"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("IPv4")
                 .short("4")
                 .long("ipv4")
                 .help("Resolve host names to IPv4 addresses"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("IPv6")
                 .short("6")
                 .long("ipv6")
                 .help("Resolve host names to IPv6 addresses"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("UA")
                 .short("A")
                 .long("user-agent")
                 .default_value(user_agent.as_str())
                 .help("The user-agent HTTP header to use"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
                 .multiple(true)
                 .help("<host:port:address> Resolve the host+port to this address"),
-        ).get_matches();
+        )
+        .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
@@ -122,13 +131,15 @@ pub fn run() -> CabotResult<()> {
                         std::process::exit(1);
                     }
                     resolv
-                }).map(|mut resolv| {
+                })
+                .map(|mut resolv| {
                     (
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                     )
-                }).map(|(host, port, addr)| {
+                })
+                .map(|(host, port, addr)| {
                     let parsed_port = port.parse::<usize>();
                     if parsed_port.is_err() {
                         let _ = writeln!(

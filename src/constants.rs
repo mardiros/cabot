@@ -9,9 +9,8 @@ use regex::Regex;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn user_agent() -> String {
-  format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+    format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
-
 
 lazy_static! {
     pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new("\r?\n\r?\n").unwrap();

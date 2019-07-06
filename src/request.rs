@@ -145,7 +145,8 @@ impl Request {
                 self.http_method(),
                 self.request_uri(),
                 self.http_version()
-            ).as_bytes(),
+            )
+            .as_bytes(),
         );
 
         for header in self.headers.as_slice() {
@@ -270,13 +271,15 @@ impl RequestBuilder {
     pub fn build(&self) -> CabotResult<Request> {
         let url = self.url.as_ref().map_err(|err| *err)?;
 
-        let host = url.host_str().ok_or(
-            CabotError::OpaqueUrlError("Unable to find host".to_string())
-        )?;
+        let host = url.host_str().ok_or(CabotError::OpaqueUrlError(
+            "Unable to find host".to_string(),
+        ))?;
 
-        let port = url.port_or_known_default().ok_or(
-            CabotError::OpaqueUrlError("Unable to determine a port".to_string())
-        )?;
+        let port = url
+            .port_or_known_default()
+            .ok_or(CabotError::OpaqueUrlError(
+                "Unable to determine a port".to_string(),
+            ))?;
 
         let query = url.query();
         let mut request_uri = url.path().to_owned();
