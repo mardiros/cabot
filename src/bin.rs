@@ -257,28 +257,7 @@ impl<'a> CabotBinWrite<'a> {
 
 impl<'a> Write for CabotBinWrite<'a> {
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
-
-        // If there is headers and we logged them
-        if !self.header_read && response.len() == 2 && (log_enabled!(Info) || self.verbose) {
-            self.display_headers(&response[0]);
-            self.header_read = true;
-        }
-
-        let body = if response.len() == 2 {
-            let start = &response[0].len() + 4;
-            &buf[start..]
-        } else {
-            &buf[..]
-        };
-
-        if log_enabled!(Info) {
-            info!("< [[{} bytes]]", body.len());
-        } else if self.verbose {
-            writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
-        }
-
-        self.out.write_all(body)?;
+        self.write(buf)?;
         self.flush()?;
         Ok(())
     }
@@ -290,6 +269,7 @@ impl<'a> Write for CabotBinWrite<'a> {
     // may receive headers
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.header_read {
+            // FIXME: should ensure we have all headers in the buffer
             self.display_headers(&buf);
             self.header_read = true;
         }
