@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+26
+Voici les donnees du premier morceau
+
+1C
+et voici un second morceau
+
+20
+et voici deux derniers morceaux 
+12
+sans saut de ligne
+0
