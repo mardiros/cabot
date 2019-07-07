@@ -16,10 +16,15 @@ lazy_static! {
     pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new(r"\r\n\r\n").unwrap();
     pub static ref SPLIT_HEADER_BRE: BytesRegex = BytesRegex::new(r"\r\n").unwrap();
     pub static ref GET_CHUNK_SIZE: BytesRegex = BytesRegex::new(r"([0-9A-Fa-f]+)").unwrap();
-    pub static ref SPLIT_HEADER_RE: Regex = Regex::new(r"\r?\n").unwrap();
+    pub static ref SPLIT_HEADER_RE: Regex = Regex::new(r"\r\n").unwrap();
     pub static ref TRANSFER_ENCODING: BytesRegex =
         BytesRegexBuilder::new(r"\nTransfer-Encoding:\s*(\S*)")
             .case_insensitive(true)
             .build()
             .expect("Invalid TRANSFER_ENCODING Regex");
+    pub static ref CONTENT_LENGTH: BytesRegex =
+        BytesRegexBuilder::new(r"\nContent-Length:\s*(\S*)")
+            .case_insensitive(true)
+            .build()
+            .expect("Invalid CONTENT_LENGTH Regex");
 }

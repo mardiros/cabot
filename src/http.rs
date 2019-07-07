@@ -21,6 +21,7 @@ const RESPONSE_BUFFER_SIZE: usize = 1024;
 
 #[derive(Debug, PartialEq)]
 enum TransferEncoding {
+    ContentLength(usize),
     Chunked,
     Unkown,
     None,
@@ -84,6 +85,12 @@ where
                     if let Some(tenc) = header.get(1) {
                         self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
                     }
+                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
+                    if let Some(clength) = header.get(1) {
+                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
+                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
+                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
+                    }
                 }
                 let resp = headers.len();
                 self.writer.write(headers).unwrap();
@@ -109,6 +116,20 @@ where
         }
 
         self.writer.flush()?;
+        Ok(())
+    }
+
+    fn read_content_length(&mut self, size: usize) -> IoResult<()> {
+        let mut read_count = self.buffer.len();
+        loop {
+            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.buffer.clear();
+
+            if read_count >= size {
+                break;
+            }
+            read_count = read_count + self.chunk_read()?;
+        }
         Ok(())
     }
 
@@ -143,7 +164,7 @@ where
                 }
 
                 if read_size == 0 {
-                    self.buffer.clear();  // should we check that it is '0\r\n' ?
+                    self.buffer.clear(); // should we check that it is '0\r\n' ?
                     break 'outer;
                 }
 
@@ -178,6 +199,9 @@ where
         info!("Reading body");
 
         match self.transfer_encoding {
+            TransferEncoding::ContentLength(size) => {
+                self.read_content_length(size)?;
+            }
             TransferEncoding::Chunked => {
                 self.read_write_chunk()?;
             }
