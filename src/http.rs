@@ -45,6 +45,43 @@ struct HttpDecoder<'a, T> {
     transfer_encoding: TransferEncoding,
 }
 
+impl<'a, T> HttpDecoder<'a, T> {
+    fn process_headers(&mut self) -> Option<usize> {
+        let ret = {
+            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
+                .splitn(self.buffer.as_slice(), 2)
+                .collect();
+            if resp_header.len() == 2 {
+                // We have headers
+                let headers = resp_header.get(0).unwrap();
+                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
+                    if let Some(tenc) = header.get(1) {
+                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
+                    }
+                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
+                    if let Some(clength) = header.get(1) {
+                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
+                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
+                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
+                    }
+                }
+                let resp = headers.len();
+                self.writer.write(headers).unwrap();
+                self.writer.write(b"\r\n\r\n").unwrap();
+                Some(resp + 4) // + CRLF CRLF
+            } else {
+                None
+            }
+        };
+        if let Some(to_drain) = ret {
+            let buffer = self.buffer.drain(to_drain..).collect();
+            self.buffer = buffer;
+            info!("Headers read");
+        }
+        ret
+    }
+}
+
 impl<'a, T> HttpDecoder<'a, T>
 where
     for<'b> T: Read + Sized,
@@ -69,38 +106,16 @@ where
     }
     fn read_write_headers(&mut self) -> IoResult<()> {
         info!("Reading headers");
-        let to_drain = loop {
+        loop {
             let count = self.chunk_read()?;
             info!("Count: {}", count);
             if count == 0 {
-                break 0;
+                break;
             }
-            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
-                .splitn(self.buffer.as_slice(), 2)
-                .collect();
-            if resp_header.len() == 2 {
-                // We have headers
-                let headers = resp_header.get(0).unwrap();
-                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
-                    if let Some(tenc) = header.get(1) {
-                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
-                    }
-                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
-                    if let Some(clength) = header.get(1) {
-                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
-                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
-                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
-                    }
-                }
-                let resp = headers.len();
-                self.writer.write(headers).unwrap();
-                self.writer.write(b"\r\n\r\n").unwrap();
-                break resp + 4; // + CRLF CRLF
+            if let Some(_) = self.process_headers() {
+                break;
             }
-        };
-        let buffer = self.buffer.drain(to_drain..).collect();
-        self.buffer = buffer;
-        info!("Headers read");
+        }
         Ok(())
     }
 
@@ -173,7 +188,6 @@ where
 
                 if !read_chunk && self.buffer.len() >= read_size + 2 {
                     let mut buffer: Vec<u8> = self.buffer.drain(read_size..).collect();
-                    debug!("{:?}", String::from_utf8_lossy(self.buffer.as_slice()));
                     self.writer.write(self.buffer.as_slice()).unwrap();
                     self.writer.flush()?;
 
@@ -185,7 +199,6 @@ where
             }
 
             let cnt = self.chunk_read()?;
-            info!("!!!! {:?}", cnt);
             if cnt == 0 {
                 break;
             }
@@ -194,10 +207,8 @@ where
         Ok(())
     }
 
-    fn read_write(&mut self) -> IoResult<()> {
-        self.read_write_headers()?;
+    fn read_write_body(&mut self) -> IoResult<()> {
         info!("Reading body");
-
         match self.transfer_encoding {
             TransferEncoding::ContentLength(size) => {
                 self.read_content_length(size)?;
@@ -206,6 +217,7 @@ where
                 self.read_write_chunk()?;
             }
             _ => {
+                warn!("Neither Content-Length, not chunk is response header");
                 self.read_write_no_transfer_encoding()?;
             }
         }
@@ -216,6 +228,11 @@ where
         }
 
         Ok(())
+    }
+
+    fn read_write(&mut self) -> IoResult<()> {
+        self.read_write_headers()?;
+        self.read_write_body()
     }
 }
 
@@ -306,6 +323,7 @@ fn from_https(
         .map_err(|_| CabotError::HostnameParseError(request.host().to_owned()))?;
     let mut tlsclient = ClientSession::new(&rc_config, host);
     let mut is_handshaking = true;
+
     loop {
         while tlsclient.wants_write() {
             let count = tlsclient.write_tls(&mut client).unwrap();
@@ -362,7 +380,11 @@ fn from_https(
             break;
         }
     }
-    out.write_all(response.as_slice()).unwrap();
+
+    let mut http_decoder = HttpDecoder::new(out, client);
+    http_decoder.buffer = response;
+    http_decoder.process_headers().unwrap();
+    http_decoder.read_write_body()?;
     Ok(())
 }
 
