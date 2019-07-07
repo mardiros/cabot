@@ -228,12 +228,30 @@ fn main() {
 
 struct CabotBinWrite<'a> {
     out: &'a mut Write,
+    header_read: bool,
     verbose: bool,
 }
 
 impl<'a> CabotBinWrite<'a> {
     pub fn new(out: &'a mut Write, verbose: bool) -> Self {
-        CabotBinWrite { out, verbose }
+        CabotBinWrite {
+            out,
+            verbose,
+            header_read: false,
+        }
+    }
+    fn display_headers(&self, buf: &[u8]) {
+        let headers = String::from_utf8_lossy(buf);
+        let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
+        if log_enabled!(Info) {
+            for part in split {
+                info!("< {}", part);
+            }
+        } else if self.verbose {
+            for part in split {
+                writeln!(&mut stderr(), "< {}", part).unwrap();
+            }
+        }
     }
 }
 
@@ -242,19 +260,9 @@ impl<'a> Write for CabotBinWrite<'a> {
         let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
 
         // If there is headers and we logged them
-        if response.len() == 2 && (log_enabled!(Info) || self.verbose) {
-            let headers = &response[0];
-            let headers = String::from_utf8_lossy(headers);
-            let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-            if log_enabled!(Info) {
-                for part in split {
-                    info!("< {}", part);
-                }
-            } else if self.verbose {
-                for part in split {
-                    writeln!(&mut stderr(), "< {}", part).unwrap();
-                }
-            }
+        if !self.header_read && response.len() == 2 && (log_enabled!(Info) || self.verbose) {
+            self.display_headers(&response[0]);
+            self.header_read = true;
         }
 
         let body = if response.len() == 2 {
@@ -279,12 +287,16 @@ impl<'a> Write for CabotBinWrite<'a> {
         self.out.flush()
     }
 
-    // Don't implemented unused method
-
-    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    // may receive headers
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !self.header_read {
+            self.display_headers(&buf);
+            self.header_read = true;
+        }
+        self.out.write(buf)
     }
 
+    // Don't implemented unused method
     fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }

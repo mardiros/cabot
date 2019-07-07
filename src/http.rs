@@ -1,7 +1,7 @@
 //! Low level and internal http and https implementation.
 
 use std::collections::HashMap;
-use std::io::{stderr, Read, Write};
+use std::io::{stderr, Read, Result as IoResult, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,8 +16,184 @@ use super::dns::Resolver;
 use super::request::Request;
 use super::results::{CabotError, CabotResult};
 
-const BUFFER_PAGE_SIZE: usize = 1024;
+const BUFFER_PAGE_SIZE: usize = 2048;
 const RESPONSE_BUFFER_SIZE: usize = 1024;
+
+#[derive(Debug, PartialEq)]
+enum TransferEncoding {
+    Chunked,
+    Unkown,
+    None,
+}
+
+impl From<&[u8]> for TransferEncoding {
+    fn from(hdr: &[u8]) -> Self {
+        let hdr = String::from_utf8_lossy(hdr);
+        let hdrup = hdr.to_ascii_uppercase();
+        match hdrup.as_str() {
+            "CHUNKED" => TransferEncoding::Chunked,
+            _ => TransferEncoding::Unkown,
+        }
+    }
+}
+
+struct HttpDecoder<'a, T> {
+    writer: &'a mut Write,
+    reader: &'a mut T,
+    buffer: Vec<u8>,
+    transfer_encoding: TransferEncoding,
+}
+
+impl<'a, T> HttpDecoder<'a, T>
+where
+    for<'b> T: Read + Sized,
+{
+    fn new(writer: &'a mut Write, reader: &'a mut T) -> Self {
+        HttpDecoder {
+            writer,
+            reader,
+            buffer: Vec::with_capacity(BUFFER_PAGE_SIZE),
+            transfer_encoding: TransferEncoding::None,
+        }
+    }
+    fn chunk_read(&mut self) -> IoResult<usize> {
+        let mut buf = [0; BUFFER_PAGE_SIZE];
+        let ret = self.reader.read(&mut buf[..]);
+        if let Ok(count) = ret {
+            if count > 0 {
+                self.buffer.extend_from_slice(&buf[0..count]);
+            }
+        }
+        ret
+    }
+    fn read_write_headers(&mut self) -> IoResult<()> {
+        info!("Reading headers");
+        let to_drain = loop {
+            let count = self.chunk_read()?;
+            info!("Count: {}", count);
+            if count == 0 {
+                break 0;
+            }
+            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
+                .splitn(self.buffer.as_slice(), 2)
+                .collect();
+            if resp_header.len() == 2 {
+                // We have headers
+                let headers = resp_header.get(0).unwrap();
+                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
+                    if let Some(tenc) = header.get(1) {
+                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
+                    }
+                }
+                let resp = headers.len();
+                self.writer.write(headers).unwrap();
+                self.writer.write(b"\r\n\r\n").unwrap();
+                break resp + 4; // + CRLF CRLF
+            }
+        };
+        let buffer = self.buffer.drain(to_drain..).collect();
+        self.buffer = buffer;
+        info!("Headers read");
+        Ok(())
+    }
+
+    fn read_write_no_transfer_encoding(&mut self) -> IoResult<()> {
+        loop {
+            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.buffer.clear();
+
+            let cnt = self.chunk_read()?;
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        self.writer.flush()?;
+        Ok(())
+    }
+
+    fn read_write_chunk(&mut self) -> IoResult<()> {
+        // vars for chunk encoding only
+        let mut read_chunk = true;
+        let mut read_size = 0;
+        let mut header_len: usize;
+
+        'outer: loop {
+            while read_chunk {
+                header_len = 0;
+                {
+                    // we read the chunk size to drain
+                    let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
+                        .splitn(self.buffer.as_slice(), 2)
+                        .collect();
+                    if header.len() == 2 {
+                        if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
+                            if let Some(size) = header.get(1) {
+                                let size = size.as_bytes();
+                                header_len = size.len() + 2;
+                                let size = String::from_utf8_lossy(size).into_owned();
+                                read_size = usize::from_str_radix(size.as_str(), 16).unwrap();
+                                read_chunk = false;
+                            }
+                        } else {
+                            // else return Error
+                            break;
+                        }
+                    }
+                }
+
+                if read_size == 0 {
+                    self.buffer.clear();  // should we check that it is '0\r\n' ?
+                    break 'outer;
+                }
+
+                let buffer: Vec<u8> = self.buffer.drain(header_len..).collect();
+                self.buffer = buffer;
+
+                if !read_chunk && self.buffer.len() >= read_size + 2 {
+                    let mut buffer: Vec<u8> = self.buffer.drain(read_size..).collect();
+                    debug!("{:?}", String::from_utf8_lossy(self.buffer.as_slice()));
+                    self.writer.write(self.buffer.as_slice()).unwrap();
+                    self.writer.flush()?;
+
+                    let buffer2 = buffer.drain(2..).collect(); // CRLF
+                    self.buffer = buffer2;
+                    read_chunk = true;
+                    read_size = 0;
+                }
+            }
+
+            let cnt = self.chunk_read()?;
+            info!("!!!! {:?}", cnt);
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_write(&mut self) -> IoResult<()> {
+        self.read_write_headers()?;
+        info!("Reading body");
+
+        match self.transfer_encoding {
+            TransferEncoding::Chunked => {
+                self.read_write_chunk()?;
+            }
+            _ => {
+                self.read_write_no_transfer_encoding()?;
+            }
+        }
+
+        if self.buffer.len() > 0 {
+            let b = String::from_utf8_lossy(self.buffer.as_slice());
+            error!("Buffer not clear: {}", b);
+        }
+
+        Ok(())
+    }
+}
 
 fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
@@ -78,9 +254,11 @@ fn from_http(
 
     debug!("Sending request...");
     client.write_all(&raw_request).unwrap();
-    let mut buf = [0; BUFFER_PAGE_SIZE];
-    let response = read_buf(client, &mut buf);
-    out.write_all(response.as_slice()).unwrap();
+
+    debug!("Reading response headers...");
+
+    let mut http_decoder = HttpDecoder::new(out, client);
+    http_decoder.read_write()?;
     Ok(())
 }
 
