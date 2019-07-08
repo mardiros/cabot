@@ -68,7 +68,6 @@ impl<'a, T> HttpDecoder<'a, T> {
                 }
                 let resp = headers.len();
                 self.writer.write(headers).unwrap();
-                self.writer.write(b"\r\n\r\n").unwrap();
                 Some(resp + 4) // + CRLF CRLF
             } else {
                 None

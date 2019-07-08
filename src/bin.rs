@@ -256,11 +256,6 @@ impl<'a> CabotBinWrite<'a> {
 }
 
 impl<'a> Write for CabotBinWrite<'a> {
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.write(buf)?;
-        self.flush()?;
-        Ok(())
-    }
 
     fn flush(&mut self) -> io::Result<()> {
         self.out.flush()
@@ -269,14 +264,24 @@ impl<'a> Write for CabotBinWrite<'a> {
     // may receive headers
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.header_read {
-            // FIXME: should ensure we have all headers in the buffer
-            self.display_headers(&buf);
+            // the first time write is called, all headers are sent
+        // in the buffer. there is no need to parse it again.
+            if log_enabled!(Info) || self.verbose {
+                self.display_headers(&buf);
+            }
             self.header_read = true;
+            Ok(0)
         }
-        self.out.write(buf)
+        else {
+            self.out.write(buf)
+        }
     }
 
     // Don't implemented unused method
+    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    }
+
     fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
