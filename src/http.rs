@@ -118,7 +118,6 @@ impl<'a, T> HttpDecoder<'a, T> {
             if !read_chunk && self.buffer.len() >= read_size + 2 {
                 let mut buffer: Vec<u8> = self.buffer.drain(read_size..).collect();
                 self.writer.write(self.buffer.as_slice()).unwrap();
-                self.writer.flush()?;
 
                 let buffer2 = buffer.drain(2..).collect(); // CRLF
                 self.buffer = buffer2;
@@ -180,7 +179,6 @@ where
             }
         }
 
-        self.writer.flush()?;
         Ok(())
     }
 
@@ -238,7 +236,8 @@ where
 
     fn read_write(&mut self) -> IoResult<()> {
         self.read_write_headers()?;
-        self.read_write_body()
+        self.read_write_body()?;
+        self.writer.flush()
     }
 
     /// TLS
@@ -313,14 +312,13 @@ where
             }
         }
 
-        self.writer.flush()?;
         Ok(())
     }
 
     fn read_content_length_tls(&mut self, size: usize) -> IoResult<()> {
         let mut read_count = self.buffer.len();
         loop {
-            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.writer.write(self.buffer.as_slice())?;
             self.buffer.clear();
 
             if read_count >= size {
@@ -372,7 +370,8 @@ where
 
     fn read_write_tls(&mut self) -> IoResult<()> {
         self.read_write_headers_tls()?;
-        self.read_write_body_tls()
+        self.read_write_body_tls()?;
+        self.writer.flush()
     }
 }
 

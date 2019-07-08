@@ -257,10 +257,6 @@ impl<'a> CabotBinWrite<'a> {
 
 impl<'a> Write for CabotBinWrite<'a> {
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.out.flush()
-    }
-
     // may receive headers
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.header_read {
@@ -275,6 +271,13 @@ impl<'a> Write for CabotBinWrite<'a> {
         else {
             self.out.write(buf)
         }
+    }
+
+    /// this function is called when the request is done
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()?;
+        info!("End of the query");
+        Ok(())
     }
 
     // Don't implemented unused method
