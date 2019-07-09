@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::io::{self, Write};
-use std::net::SocketAddr;
 use std::mem;
+use std::net::SocketAddr;
 
 use super::constants;
 use super::http;
@@ -115,7 +115,6 @@ impl CabotLibWrite {
             }
         }
         self.response_builder = builder;
-
     }
 
     pub fn response(&self) -> CabotResult<Response> {
@@ -124,14 +123,12 @@ impl CabotLibWrite {
 }
 
 impl Write for CabotLibWrite {
-
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.header_read {
             self.split_headers(&buf);
             self.header_read = true;
             Ok(0)
-        }
-        else {
+        } else {
             self.body_buffer.extend_from_slice(&buf);
             Ok(buf.len())
         }
@@ -146,11 +143,9 @@ impl Write for CabotLibWrite {
 
     // Don't implemented unused method
 
-
     fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
-
 
     fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
@@ -165,14 +160,13 @@ mod tests {
     fn test_build_http_response_from_string() {
         let response = [
             vec![
-            "HTTP/1.1 200 Ok",
-            "Content-Type: text/plain",
-            "Content-Length: 12",
-            ].join("\r\n"),
-            vec![
-            "Hello World!",
-            ].join("\r\n")
-            ];
+                "HTTP/1.1 200 Ok",
+                "Content-Type: text/plain",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
+        ];
 
         let mut out = CabotLibWrite::new();
         out.write(response[0].as_bytes()).unwrap();
@@ -194,15 +188,14 @@ mod tests {
     fn test_build_http_header_obsolete_line_folding() {
         let response = [
             vec![
-            "HTTP/1.1 200 Ok",
-            "ows: https://tools.ietf.org/html/rfc7230",
-            "  #section-3.2.4",
-            "Content-Length: 12",
-            ].join("\r\n"),
-            vec![
-            "Hello World!",
-            ].join("\r\n")
-            ];
+                "HTTP/1.1 200 Ok",
+                "ows: https://tools.ietf.org/html/rfc7230",
+                "  #section-3.2.4",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
+        ];
 
         let mut out = CabotLibWrite::new();
         out.write(response[0].as_bytes()).unwrap();
@@ -227,15 +220,14 @@ mod tests {
     fn test_build_http_header_obsolete_line_folding_tab() {
         let response = [
             vec![
-            "HTTP/1.1 200 Ok",
-            "ows: https://tools.ietf.org/html/rfc7230",
-            "\t#section-3.2.4",
-            "Content-Length: 12",
-            ].join("\r\n"),
-            vec![
-            "Hello World!",
-            ].join("\r\n")
-            ];
+                "HTTP/1.1 200 Ok",
+                "ows: https://tools.ietf.org/html/rfc7230",
+                "\t#section-3.2.4",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
+        ];
 
         let mut out = CabotLibWrite::new();
         out.write(response[0].as_bytes()).unwrap();
@@ -261,7 +253,8 @@ mod tests {
         let response = vec![
             "HTTP/1.1 302 Moved",
             "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
-        ].join("\r\n");
+        ]
+        .join("\r\n");
 
         let mut out = CabotLibWrite::new();
         out.write(response.as_bytes()).unwrap();

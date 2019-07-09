@@ -256,19 +256,17 @@ impl<'a> CabotBinWrite<'a> {
 }
 
 impl<'a> Write for CabotBinWrite<'a> {
-
     // may receive headers
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.header_read {
             // the first time write is called, all headers are sent
-        // in the buffer. there is no need to parse it again.
+            // in the buffer. there is no need to parse it again.
             if log_enabled!(Info) || self.verbose {
                 self.display_headers(&buf);
             }
             self.header_read = true;
             Ok(0)
-        }
-        else {
+        } else {
             self.out.write(buf)
         }
     }
