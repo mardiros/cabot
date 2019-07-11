@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## cabot 0.3.0 2019-07-11
+
+ * Implement `Transfer-Encoding: chunked`.
+ * Use the `Content-Length` returned to get the number of bytes to read before closing the connection
+ * Stream the ouput from the socket to stdout in the CLI
+ * Update header separate to be strict with the spec. \r is no more consider optional.
+
 ## cabot 0.2.1 2019-07-03
 
  * Upgrade dependencies.
