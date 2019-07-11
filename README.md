@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/mardiros/cabot.svg?branch=master)](https://travis-ci.org/mardiros/cabot)
 [![Current Crates.io Version](https://img.shields.io/crates/v/cabot.svg)](https://crates.io/crates/cabot)
+[![dependency status](https://deps.rs/repo/github/mardiros/cabot/status.svg)](https://deps.rs/repo/github/mardiros/cabot)
 [![Latests Documentation](https://docs.rs/cabot/badge.svg)](https://docs.rs/crate/cabot)
 
 ## Cabot is a simple Rust library to perform HTTP call.
