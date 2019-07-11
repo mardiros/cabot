@@ -23,7 +23,6 @@ use cabot::request::RequestBuilder;
 use cabot::results::CabotResult;
 
 pub fn run() -> CabotResult<()> {
-
     let user_agent: String = constants::user_agent();
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
@@ -34,59 +33,69 @@ pub fn run() -> CabotResult<()> {
                 .index(1)
                 .required(true)
                 .help("URL to request"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("REQUEST")
                 .short("X")
                 .long("request")
                 .default_value("GET")
                 .help("Specify request command to use"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("HEADER")
                 .short("H")
                 .long("header")
                 .takes_value(true)
                 .multiple(true)
                 .help("Pass custom header to server"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("FILE")
                 .short("o")
                 .long("output")
                 .takes_value(true)
                 .help("Write to FILE instead of stdout"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("VERBOSE")
                 .short("v")
                 .long("verbose")
                 .help("Make the operation more talkative"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("BODY")
                 .short("d")
                 .long("data")
                 .takes_value(true)
                 .help("Post Data (Using utf-8 encoding)"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("IPv4")
                 .short("4")
                 .long("ipv4")
                 .help("Resolve host names to IPv4 addresses"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("IPv6")
                 .short("6")
                 .long("ipv6")
                 .help("Resolve host names to IPv6 addresses"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("UA")
                 .short("A")
                 .long("user-agent")
                 .default_value(user_agent.as_str())
                 .help("The user-agent HTTP header to use"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
                 .multiple(true)
                 .help("<host:port:address> Resolve the host+port to this address"),
-        ).get_matches();
+        )
+        .get_matches();
 
     let url = matches.value_of("URL").unwrap();
     let http_method = matches.value_of("REQUEST").unwrap();
@@ -122,13 +131,15 @@ pub fn run() -> CabotResult<()> {
                         std::process::exit(1);
                     }
                     resolv
-                }).map(|mut resolv| {
+                })
+                .map(|mut resolv| {
                     (
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                         resolv.next().unwrap(),
                     )
-                }).map(|(host, port, addr)| {
+                })
+                .map(|(host, port, addr)| {
                     let parsed_port = port.parse::<usize>();
                     if parsed_port.is_err() {
                         let _ = writeln!(
@@ -217,60 +228,58 @@ fn main() {
 
 struct CabotBinWrite<'a> {
     out: &'a mut Write,
+    header_read: bool,
     verbose: bool,
 }
 
 impl<'a> CabotBinWrite<'a> {
     pub fn new(out: &'a mut Write, verbose: bool) -> Self {
-        CabotBinWrite { out, verbose }
+        CabotBinWrite {
+            out,
+            verbose,
+            header_read: false,
+        }
+    }
+    fn display_headers(&self, buf: &[u8]) {
+        let headers = String::from_utf8_lossy(buf);
+        let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
+        if log_enabled!(Info) {
+            for part in split {
+                info!("< {}", part);
+            }
+        } else if self.verbose {
+            for part in split {
+                writeln!(&mut stderr(), "< {}", part).unwrap();
+            }
+        }
     }
 }
 
 impl<'a> Write for CabotBinWrite<'a> {
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
-
-        // If there is headers and we logged them
-        if response.len() == 2 && (log_enabled!(Info) || self.verbose) {
-            let headers = &response[0];
-            let headers = String::from_utf8_lossy(headers);
-            let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-            if log_enabled!(Info) {
-                for part in split {
-                    info!("< {}", part);
-                }
-            } else if self.verbose {
-                for part in split {
-                    writeln!(&mut stderr(), "< {}", part).unwrap();
-                }
+    // may receive headers
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !self.header_read {
+            // the first time write is called, all headers are sent
+            // in the buffer. there is no need to parse it again.
+            if log_enabled!(Info) || self.verbose {
+                self.display_headers(&buf);
             }
-        }
-
-        let body = if response.len() == 2 {
-            let start = &response[0].len() + 4;
-            &buf[start..]
+            self.header_read = true;
+            Ok(0)
         } else {
-            &buf[..]
-        };
-
-        if log_enabled!(Info) {
-            info!("< [[{} bytes]]", body.len());
-        } else if self.verbose {
-            writeln!(&mut stderr(), "< [[{} bytes]]", body.len()).unwrap();
+            self.out.write(buf)
         }
+    }
 
-        self.out.write_all(body)?;
-        self.flush()?;
+    /// this function is called when the request is done
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()?;
+        info!("End of the query");
         Ok(())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.out.flush()
-    }
-
     // Don't implemented unused method
-
-    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
 

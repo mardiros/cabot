@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::io::{self, Write};
+use std::mem;
 use std::net::SocketAddr;
 
 use super::constants;
@@ -62,6 +63,8 @@ impl Client {
 }
 
 struct CabotLibWrite {
+    header_read: bool,
+    body_buffer: Vec<u8>,
     response_builder: ResponseBuilder,
 }
 
@@ -69,26 +72,20 @@ impl CabotLibWrite {
     pub fn new() -> Self {
         CabotLibWrite {
             response_builder: ResponseBuilder::new(),
+            body_buffer: Vec::new(),
+            header_read: false,
         }
     }
 
-    pub fn response(&self) -> CabotResult<Response> {
-        self.response_builder.build()
-    }
-}
+    fn split_headers(&mut self, buf: &[u8]) {
+        let headers = String::from_utf8_lossy(buf);
+        let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
 
-impl Write for CabotLibWrite {
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        info!("Parsing http response");
-        let response: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(buf, 2).collect();
-        let header_len = &response[0].len();
-        let headers_str = String::from_utf8_lossy(&response[0]);
-        let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers_str).collect();
-
-        let mut builder = ResponseBuilder::new();
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);
-        builder = builder.set_status_line(status_line);
+        let builder = ResponseBuilder::new();
+        let mut builder = builder.set_status_line(status_line);
+
         let mut iter_header = headers.iter().peekable();
         let header = iter_header.next();
         if header.is_some() {
@@ -117,25 +114,36 @@ impl Write for CabotLibWrite {
                 let _ = iter_header.next();
             }
         }
-        let body = if (header_len + 4) < buf.len() {
-            &buf[(header_len + 4)..buf.len()]
-        } else {
-            &[]
-        };
-        // debug!("Adding body {:?}", body);
-        builder = builder.set_body(body);
         self.response_builder = builder;
-        // debug!("Response Builder - {:?}", self.response_builder);
-        Ok(())
+    }
+
+    pub fn response(&self) -> CabotResult<Response> {
+        self.response_builder.build()
+    }
+}
+
+impl Write for CabotLibWrite {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !self.header_read {
+            self.split_headers(&buf);
+            self.header_read = true;
+            Ok(0)
+        } else {
+            self.body_buffer.extend_from_slice(&buf);
+            Ok(buf.len())
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        info!("Adding body {:?}", self.body_buffer);
+        let builder = mem::replace(&mut self.response_builder, ResponseBuilder::new());
+        self.response_builder = builder.set_body(self.body_buffer.as_slice());
         Ok(())
     }
 
     // Don't implemented unused method
 
-    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
     }
 
@@ -150,17 +158,20 @@ mod tests {
 
     #[test]
     fn test_build_http_response_from_string() {
-        let response = vec![
-            "HTTP/1.1 200 Ok",
-            "Content-Type: text/plain",
-            "Content-Length: 12",
-            "",
-            "Hello World!",
+        let response = [
+            vec![
+                "HTTP/1.1 200 Ok",
+                "Content-Type: text/plain",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
         ];
-        let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write_all(response.as_bytes()).unwrap();
+        out.write(response[0].as_bytes()).unwrap();
+        out.write(response[1].as_bytes()).unwrap();
+        out.flush().unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -175,18 +186,21 @@ mod tests {
 
     #[test]
     fn test_build_http_header_obsolete_line_folding() {
-        let response = vec![
-            "HTTP/1.1 200 Ok",
-            "ows: https://tools.ietf.org/html/rfc7230",
-            "  #section-3.2.4",
-            "Content-Length: 12",
-            "",
-            "Hello World!",
+        let response = [
+            vec![
+                "HTTP/1.1 200 Ok",
+                "ows: https://tools.ietf.org/html/rfc7230",
+                "  #section-3.2.4",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
         ];
-        let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write_all(response.as_bytes()).unwrap();
+        out.write(response[0].as_bytes()).unwrap();
+        out.write(response[1].as_bytes()).unwrap();
+        out.flush().unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -204,18 +218,21 @@ mod tests {
 
     #[test]
     fn test_build_http_header_obsolete_line_folding_tab() {
-        let response = vec![
-            "HTTP/1.1 200 Ok",
-            "ows: https://tools.ietf.org/html/rfc7230",
-            "\t#section-3.2.4",
-            "Content-Length: 12",
-            "",
-            "Hello World!",
+        let response = [
+            vec![
+                "HTTP/1.1 200 Ok",
+                "ows: https://tools.ietf.org/html/rfc7230",
+                "\t#section-3.2.4",
+                "Content-Length: 12",
+            ]
+            .join("\r\n"),
+            vec!["Hello World!"].join("\r\n"),
         ];
-        let response = response.join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write_all(response.as_bytes()).unwrap();
+        out.write(response[0].as_bytes()).unwrap();
+        out.write(response[1].as_bytes()).unwrap();
+        out.flush().unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -236,11 +253,12 @@ mod tests {
         let response = vec![
             "HTTP/1.1 302 Moved",
             "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
-        ];
-        let response = response.join("\r\n");
+        ]
+        .join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write_all(response.as_bytes()).unwrap();
+        out.write(response.as_bytes()).unwrap();
+        out.flush().unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 302);

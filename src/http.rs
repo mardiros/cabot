@@ -1,7 +1,7 @@
 //! Low level and internal http and https implementation.
 
 use std::collections::HashMap;
-use std::io::{stderr, Read, Write};
+use std::io::{stderr, Read, Result as IoResult, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,8 +16,364 @@ use super::dns::Resolver;
 use super::request::Request;
 use super::results::{CabotError, CabotResult};
 
-const BUFFER_PAGE_SIZE: usize = 1024;
+const BUFFER_PAGE_SIZE: usize = 2048;
 const RESPONSE_BUFFER_SIZE: usize = 1024;
+
+#[derive(Debug, PartialEq)]
+enum TransferEncoding {
+    ContentLength(usize),
+    Chunked,
+    Unkown,
+    None,
+}
+
+impl From<&[u8]> for TransferEncoding {
+    fn from(hdr: &[u8]) -> Self {
+        let hdr = String::from_utf8_lossy(hdr);
+        let hdrup = hdr.to_ascii_uppercase();
+        match hdrup.as_str() {
+            "CHUNKED" => TransferEncoding::Chunked,
+            _ => TransferEncoding::Unkown,
+        }
+    }
+}
+
+struct HttpDecoder<'a, T> {
+    writer: &'a mut Write,
+    reader: &'a mut T,
+    tls_session: Option<&'a mut ClientSession>,
+    buffer: Vec<u8>,
+    transfer_encoding: TransferEncoding,
+}
+
+impl<'a, T> HttpDecoder<'a, T> {
+    fn process_headers(&mut self) -> Option<usize> {
+        let ret = {
+            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
+                .splitn(self.buffer.as_slice(), 2)
+                .collect();
+            if resp_header.len() == 2 {
+                // We have headers
+                let headers = resp_header.get(0).unwrap();
+                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
+                    if let Some(tenc) = header.get(1) {
+                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
+                    }
+                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
+                    if let Some(clength) = header.get(1) {
+                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
+                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
+                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
+                    }
+                }
+                let resp = headers.len();
+                self.writer.write(headers).unwrap();
+                Some(resp + 4) // + CRLF CRLF
+            } else {
+                None
+            }
+        };
+        if let Some(to_drain) = ret {
+            let buffer = self.buffer.drain(to_drain..).collect();
+            self.buffer = buffer;
+            info!("Headers read");
+        }
+        ret
+    }
+    fn process_chunk(&mut self) -> IoResult<bool> {
+        let mut read_chunk = true;
+        let mut read_size = 0;
+        let mut header_len: usize;
+        while read_chunk {
+            header_len = 0;
+            {
+                // we read the chunk size to drain
+                let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
+                    .splitn(self.buffer.as_slice(), 2)
+                    .collect();
+                if header.len() == 2 {
+                    if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
+                        if let Some(size) = header.get(1) {
+                            let size = size.as_bytes();
+                            header_len = size.len() + 2;
+                            let size = String::from_utf8_lossy(size).into_owned();
+                            read_size = usize::from_str_radix(size.as_str(), 16).unwrap();
+                            read_chunk = false;
+                        }
+                    } else {
+                        // else return Error
+                        break;
+                    }
+                }
+            }
+
+            if read_size == 0 {
+                self.buffer.clear(); // should we check that it is '0\r\n' ?
+                return Ok(true);
+            }
+
+            let buffer: Vec<u8> = self.buffer.drain(header_len..).collect();
+            self.buffer = buffer;
+
+            if !read_chunk && self.buffer.len() >= read_size + 2 {
+                let mut buffer: Vec<u8> = self.buffer.drain(read_size..).collect();
+                self.writer.write(self.buffer.as_slice()).unwrap();
+
+                let buffer2 = buffer.drain(2..).collect(); // CRLF
+                self.buffer = buffer2;
+                read_chunk = true;
+                read_size = 0;
+            }
+        }
+        return Ok(false);
+    }
+}
+
+impl<'a, T> HttpDecoder<'a, T>
+where
+    for<'b> T: Read + Write + Sized,
+{
+    fn new(writer: &'a mut Write, reader: &'a mut T) -> Self {
+        HttpDecoder {
+            writer,
+            reader,
+            tls_session: None,
+            buffer: Vec::with_capacity(BUFFER_PAGE_SIZE),
+            transfer_encoding: TransferEncoding::None,
+        }
+    }
+
+    fn chunk_read(&mut self) -> IoResult<usize> {
+        let mut buf = [0; BUFFER_PAGE_SIZE];
+        let ret = self.reader.read(&mut buf[..]);
+        if let Ok(count) = ret {
+            if count > 0 {
+                self.buffer.extend_from_slice(&buf[0..count]);
+            }
+        }
+        ret
+    }
+    fn read_write_headers(&mut self) -> IoResult<()> {
+        info!("Reading headers");
+        loop {
+            let count = self.chunk_read()?;
+            info!("Count: {}", count);
+            if count == 0 {
+                break;
+            }
+            if let Some(_) = self.process_headers() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn read_write_no_transfer_encoding(&mut self) -> IoResult<()> {
+        loop {
+            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.buffer.clear();
+
+            let cnt = self.chunk_read()?;
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_content_length(&mut self, size: usize) -> IoResult<()> {
+        let mut read_count = self.buffer.len();
+        loop {
+            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.buffer.clear();
+
+            if read_count >= size {
+                break;
+            }
+            read_count = read_count + self.chunk_read()?;
+        }
+        Ok(())
+    }
+
+    fn read_write_chunk(&mut self) -> IoResult<()> {
+        loop {
+            let done = self.process_chunk()?;
+            if done {
+                break;
+            }
+            let cnt = self.chunk_read()?;
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_write_body(&mut self) -> IoResult<()> {
+        info!("Reading body");
+        match self.transfer_encoding {
+            TransferEncoding::ContentLength(size) => {
+                self.read_content_length(size)?;
+            }
+            TransferEncoding::Chunked => {
+                self.read_write_chunk()?;
+            }
+            _ => {
+                warn!("Neither Content-Length, not chunk is response header");
+                self.read_write_no_transfer_encoding()?;
+            }
+        }
+
+        if self.buffer.len() > 0 {
+            let b = String::from_utf8_lossy(self.buffer.as_slice());
+            error!("Buffer not clear: {}", b);
+        }
+
+        Ok(())
+    }
+
+    fn read_write(&mut self) -> IoResult<()> {
+        self.read_write_headers()?;
+        self.read_write_body()?;
+        self.writer.flush()
+    }
+
+    /// TLS
+
+    fn new_with_tls(
+        writer: &'a mut Write,
+        reader: &'a mut T,
+        tls_session: &'a mut ClientSession,
+    ) -> Self {
+        HttpDecoder {
+            writer,
+            reader,
+            tls_session: Some(tls_session),
+            buffer: Vec::with_capacity(BUFFER_PAGE_SIZE),
+            transfer_encoding: TransferEncoding::None,
+        }
+    }
+
+    fn chunk_read_tls(&mut self) -> IoResult<usize> {
+        let mut read_len = 0;
+        let mut read_len_tls = 0;
+        let reader = &mut self.reader;
+        let tls_session = self.tls_session.as_mut().unwrap();
+        while tls_session.wants_write() {
+            let count = tls_session.write_tls(reader).unwrap();
+            debug!("Write {} TLS bytes", count);
+        }
+        while tls_session.wants_read() {
+            let count = tls_session.read_tls(reader)?;
+            read_len_tls = read_len_tls + count;
+            debug!("Read {} TLS bytes", count);
+            if count == 0 {
+                break;
+            }
+        }
+        tls_session.process_new_packets().unwrap();
+
+        let mut buf = [0; BUFFER_PAGE_SIZE];
+        let ret = tls_session.read(&mut buf[..]);
+        if let Ok(count) = ret {
+            read_len = read_len + count;
+            if count > 0 {
+                self.buffer.extend_from_slice(&buf[0..count]);
+            }
+        }
+        Ok(read_len)
+    }
+
+    fn read_write_headers_tls(&mut self) -> IoResult<()> {
+        info!("Reading headers");
+        loop {
+            let count = self.chunk_read_tls()?;
+            info!("Count: {}", count);
+            if count == 0 {
+                break;
+            }
+            if let Some(_) = self.process_headers() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn read_write_no_transfer_encoding_tls(&mut self) -> IoResult<()> {
+        loop {
+            self.writer.write(self.buffer.as_slice()).unwrap();
+            self.buffer.clear();
+
+            let cnt = self.chunk_read_tls()?;
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_content_length_tls(&mut self, size: usize) -> IoResult<()> {
+        let mut read_count = self.buffer.len();
+        loop {
+            self.writer.write(self.buffer.as_slice())?;
+            self.buffer.clear();
+
+            if read_count >= size {
+                break;
+            }
+            read_count = read_count + self.chunk_read_tls()?;
+        }
+        Ok(())
+    }
+
+    fn read_write_chunk_tls(&mut self) -> IoResult<()> {
+        loop {
+            let done = self.process_chunk()?;
+            if done {
+                break;
+            }
+            let cnt = self.chunk_read_tls()?;
+            if cnt == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_write_body_tls(&mut self) -> IoResult<()> {
+        info!("Reading body");
+        match self.transfer_encoding {
+            TransferEncoding::ContentLength(size) => {
+                warn!("Using Content-Length to determinate the end of the query");
+                self.read_content_length_tls(size)?;
+            }
+            TransferEncoding::Chunked => {
+                self.read_write_chunk_tls()?;
+            }
+            _ => {
+                warn!("Neither Content-Length, not chunk is response header");
+                self.read_write_no_transfer_encoding_tls()?;
+            }
+        }
+
+        if self.buffer.len() > 0 {
+            let b = String::from_utf8_lossy(self.buffer.as_slice());
+            error!("Buffer not clear: {}", b);
+        }
+
+        Ok(())
+    }
+
+    fn read_write_tls(&mut self) -> IoResult<()> {
+        self.read_write_headers_tls()?;
+        self.read_write_body_tls()?;
+        self.writer.flush()
+    }
+}
 
 fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
@@ -78,9 +434,11 @@ fn from_http(
 
     debug!("Sending request...");
     client.write_all(&raw_request).unwrap();
-    let mut buf = [0; BUFFER_PAGE_SIZE];
-    let response = read_buf(client, &mut buf);
-    out.write_all(response.as_slice()).unwrap();
+
+    debug!("Reading response headers...");
+
+    let mut http_decoder = HttpDecoder::new(out, client);
+    http_decoder.read_write()?;
     Ok(())
 }
 
@@ -104,10 +462,18 @@ fn from_https(
         .map_err(|_| CabotError::HostnameParseError(request.host().to_owned()))?;
     let mut tlsclient = ClientSession::new(&rc_config, host);
     let mut is_handshaking = true;
-    loop {
+    while is_handshaking {
         while tlsclient.wants_write() {
             let count = tlsclient.write_tls(&mut client).unwrap();
             debug!("Write {} TLS bytes", count);
+        }
+        if tlsclient.wants_read() {
+            let count = tlsclient.read_tls(&mut client)?;
+            debug!("Read {} TLS bytes", count);
+            tlsclient.process_new_packets()?;
+
+            let mut part: Vec<u8> = read_buf(&mut tlsclient, &mut buf);
+            response.append(&mut part);
         }
         if is_handshaking && !tlsclient.is_handshaking() {
             info!("Handshake complete");
@@ -139,28 +505,13 @@ fn from_https(
                     info!("No TLS Protocol negociated");
                 }
             }
-            log_request(&raw_request, verbose);
-            tlsclient.write_all(&raw_request).unwrap();
-            let count = tlsclient.write_tls(&mut client).unwrap();
-            debug!("Write {} TLS bytes", count);
-        }
-
-        if tlsclient.wants_read() {
-            let count = tlsclient.read_tls(&mut client)?;
-            debug!("Read {} TLS bytes", count);
-            if count == 0 {
-                break;
-            }
-
-            tlsclient.process_new_packets()?;
-
-            let mut part: Vec<u8> = read_buf(&mut tlsclient, &mut buf);
-            response.append(&mut part);
-        } else {
-            break;
         }
     }
-    out.write_all(response.as_slice()).unwrap();
+    log_request(&raw_request, verbose);
+    tlsclient.write_all(&raw_request).unwrap();
+
+    let mut http_decoder = HttpDecoder::new_with_tls(out, client, &mut tlsclient);
+    http_decoder.read_write_tls()?;
     Ok(())
 }
 
