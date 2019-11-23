@@ -105,6 +105,7 @@ pub fn run() -> CabotResult<()> {
 
     let mut ipv4 = matches.is_present("IPv4");
     let mut ipv6 = matches.is_present("IPv6");
+
     if !ipv4 && !ipv6 {
         ipv4 = true;
         ipv6 = true;
