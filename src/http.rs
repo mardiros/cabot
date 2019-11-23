@@ -39,7 +39,7 @@ impl From<&[u8]> for TransferEncoding {
 }
 
 struct HttpDecoder<'a, T> {
-    writer: &'a mut Write,
+    writer: &'a mut dyn Write,
     reader: &'a mut T,
     tls_session: Option<&'a mut ClientSession>,
     buffer: Vec<u8>,
@@ -133,7 +133,7 @@ impl<'a, T> HttpDecoder<'a, T>
 where
     for<'b> T: Read + Write + Sized,
 {
-    fn new(writer: &'a mut Write, reader: &'a mut T) -> Self {
+    fn new(writer: &'a mut dyn Write, reader: &'a mut T) -> Self {
         HttpDecoder {
             writer,
             reader,
@@ -243,7 +243,7 @@ where
     /// TLS
 
     fn new_with_tls(
-        writer: &'a mut Write,
+        writer: &'a mut dyn Write,
         reader: &'a mut T,
         tls_session: &'a mut ClientSession,
     ) -> Self {
@@ -425,7 +425,7 @@ where
 fn from_http(
     request: &Request,
     client: &mut TcpStream,
-    out: &mut Write,
+    out: &mut dyn Write,
     verbose: bool,
 ) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
@@ -445,7 +445,7 @@ fn from_http(
 fn from_https(
     request: &Request,
     mut client: &mut TcpStream,
-    out: &mut Write,
+    out: &mut dyn Write,
     verbose: bool,
 ) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
@@ -517,7 +517,7 @@ fn from_https(
 
 pub fn http_query(
     request: &Request,
-    mut out: &mut Write,
+    mut out: &mut dyn Write,
     authorities: &HashMap<String, SocketAddr>,
     verbose: bool,
     ipv4: bool,

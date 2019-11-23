@@ -225,13 +225,13 @@ fn main() {
 // Internal Of the Binary
 
 struct CabotBinWrite<'a> {
-    out: &'a mut Write,
+    out: &'a mut dyn Write,
     header_read: bool,
     verbose: bool,
 }
 
 impl<'a> CabotBinWrite<'a> {
-    pub fn new(out: &'a mut Write, verbose: bool) -> Self {
+    pub fn new(out: &'a mut dyn Write, verbose: bool) -> Self {
         CabotBinWrite {
             out,
             verbose,
