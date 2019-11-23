@@ -1,10 +1,7 @@
 #[macro_use]
 extern crate log;
 
-extern crate pretty_env_logger;
-
-extern crate cabot;
-extern crate clap;
+use cabot;
 
 use std::collections::HashMap;
 use std::fmt::Arguments;
@@ -219,7 +216,7 @@ fn main() {
             debug!("Command cabot ended succesfully");
         }
         Err(err) => {
-            let _ = writeln!(&mut std::io::stderr(), "{}", err);
+            eprintln!("{}", err);
             std::process::exit(1);
         }
     }

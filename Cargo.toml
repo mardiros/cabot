@@ -10,7 +10,7 @@ license = "BSD-3-Clause"
 documentation = "https://docs.rs/crate/cabot"
 #homepage = "https://github.com/mardiros/cabot"
 repository = "https://github.com/mardiros/cabot"
-
+edition = "2018"
 
 [lib]
 name = "cabot"
