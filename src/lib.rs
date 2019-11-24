@@ -25,7 +25,7 @@
 //!     .build()
 //!     .unwrap();
 //! let client = Client::new();
-//! let response = client.execute(&request).unwrap();
+//! let response = client.execute(&request).await.unwrap();
 //! assert!(response.body_as_string().unwrap().contains("Rust is blazingly fast and memory-efficient"));
 //!
 //! ```

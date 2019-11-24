@@ -1,9 +1,9 @@
 //! Define results and error. `Result<T, CabotError>`
 use std::error::Error;
 use std::fmt::{self, Display};
-use std::io::Error as IOError;
 use std::string::FromUtf8Error;
 
+use async_std::io::Error as IOError;
 use rustls::TLSError;
 use url::ParseError as UrlParseError;
 

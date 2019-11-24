@@ -1,10 +1,13 @@
 //! The HTTP Client that perform query
-
 use std::collections::HashMap;
-use std::fmt::Arguments;
-use std::io::{self, Write};
 use std::mem;
 use std::net::SocketAddr;
+use std::pin::Pin;
+
+use async_std::io::{self, Write};
+use async_std::prelude::*;
+use async_std::task::Context;
+use async_std::task::Poll;
 
 use super::constants;
 use super::http;
@@ -48,7 +51,7 @@ impl Client {
 
     /// Execute the query [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
-    pub fn execute(&self, request: &Request) -> CabotResult<Response> {
+    pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
         http::http_query(
             &request,
@@ -57,7 +60,8 @@ impl Client {
             self.verbose,
             self.ipv4,
             self.ipv6,
-        )?;
+        )
+        .await?;
         out.response()
     }
 }
@@ -123,32 +127,31 @@ impl CabotLibWrite {
 }
 
 impl Write for CabotLibWrite {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if !self.header_read {
-            self.split_headers(&buf);
-            self.header_read = true;
-            Ok(0)
+    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
+        let self_ = Pin::get_mut(self);
+        if !self_.header_read {
+            self_.split_headers(&buf);
+            self_.header_read = true;
+            //Poll::Ready(Ok(0))
+            Poll::Pending
         } else {
-            self.body_buffer.extend_from_slice(&buf);
-            Ok(buf.len())
+            self_.body_buffer.extend_from_slice(&buf);
+            Poll::Ready(Ok(buf.len()))
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        info!("Adding body {:?}", self.body_buffer);
-        let builder = mem::replace(&mut self.response_builder, ResponseBuilder::new());
-        self.response_builder = builder.set_body(self.body_buffer.as_slice());
-        Ok(())
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        let self_ = Pin::get_mut(self);
+        info!("Adding body {:?}", self_.body_buffer);
+        let builder = mem::replace(&mut self_.response_builder, ResponseBuilder::new());
+        self_.response_builder = builder.set_body(self_.body_buffer.as_slice());
+        Poll::Ready(Ok(()))
     }
 
     // Don't implemented unused method
 
-    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
-    }
-
-    fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "Not Implemented")))
     }
 }
 

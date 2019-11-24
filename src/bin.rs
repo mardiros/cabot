@@ -4,22 +4,26 @@ extern crate log;
 use cabot;
 
 use std::collections::HashMap;
-use std::fmt::Arguments;
-use std::fs::OpenOptions;
-use std::io::{self, stderr, Write};
 use std::iter::FromIterator;
 use std::net::{AddrParseError, SocketAddr};
+use std::pin::Pin;
 
-use log::Level::Info;
-
+use async_std;
+use async_std::fs::OpenOptions;
+use async_std::io::{self, Write};
+use async_std::prelude::*;
+use async_std::task;
+use async_std::task::Context;
+use async_std::task::Poll;
 use clap::{App, Arg};
+use log::Level::Info;
 
 use cabot::constants;
 use cabot::http;
 use cabot::request::RequestBuilder;
 use cabot::results::CabotResult;
 
-pub fn run() -> CabotResult<()> {
+pub async fn run() -> CabotResult<()> {
     let user_agent: String = constants::user_agent();
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
@@ -121,11 +125,8 @@ pub fn run() -> CabotResult<()> {
                     let count = resolv.clone().count();
                     if count != 3 {
                         let resolv: Vec<&str> = resolv.collect();
-                        let _ = writeln!(
-                            &mut std::io::stderr(),
-                            "Invalid format in resolve argument: {}",
-                            resolv.join(":")
-                        );
+                        let _ =
+                            eprintln!("Invalid format in resolve argument: {}", resolv.join(":"));
                         std::process::exit(1);
                     }
                     resolv
@@ -140,24 +141,18 @@ pub fn run() -> CabotResult<()> {
                 .map(|(host, port, addr)| {
                     let parsed_port = port.parse::<usize>();
                     if parsed_port.is_err() {
-                        let _ = writeln!(
-                            &mut std::io::stderr(),
+                        let _ = eprintln!(
                             "Invalid port in resolve argument: {}:{}:{}",
-                            host,
-                            port,
-                            addr
+                            host, port, addr
                         );
                         std::process::exit(1);
                     }
                     let sockaddr: Result<SocketAddr, AddrParseError> =
                         format!("{}:{}", addr, port).parse();
                     if sockaddr.is_err() {
-                        let _ = writeln!(
-                            &mut std::io::stderr(),
+                        let _ = eprintln!(
                             "Invalid address in resolve argument: {}:{}:{}",
-                            host,
-                            port,
-                            addr
+                            host, port, addr
                         );
                         std::process::exit(1);
                     }
@@ -185,6 +180,7 @@ pub fn run() -> CabotResult<()> {
             .create(true)
             .truncate(true)
             .open(path)
+            .await
             .unwrap();
         http::http_query(
             &request,
@@ -193,7 +189,8 @@ pub fn run() -> CabotResult<()> {
             verbose,
             ipv4,
             ipv6,
-        )?;
+        )
+        .await?
     } else {
         http::http_query(
             &request,
@@ -202,36 +199,40 @@ pub fn run() -> CabotResult<()> {
             verbose,
             ipv4,
             ipv6,
-        )?;
+        )
+        .await?
     };
-
     Ok(())
 }
 
 fn main() {
     pretty_env_logger::init();
     debug!("Starting cabot");
-    match run() {
-        Ok(()) => {
-            debug!("Command cabot ended succesfully");
+
+    task::block_on(async {
+        let res = run();
+        match res.await {
+            Ok(()) => {
+                debug!("Command cabot ended succesfully");
+            }
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
         }
-        Err(err) => {
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
-    }
+    });
 }
 
 // Internal Of the Binary
 
 struct CabotBinWrite<'a> {
-    out: &'a mut dyn Write,
+    out: &'a mut (dyn Write + Unpin),
     header_read: bool,
     verbose: bool,
 }
 
 impl<'a> CabotBinWrite<'a> {
-    pub fn new(out: &'a mut dyn Write, verbose: bool) -> Self {
+    pub fn new(out: &'a mut (dyn Write + Unpin), verbose: bool) -> Self {
         CabotBinWrite {
             out,
             verbose,
@@ -247,7 +248,7 @@ impl<'a> CabotBinWrite<'a> {
             }
         } else if self.verbose {
             for part in split {
-                writeln!(&mut stderr(), "< {}", part).unwrap();
+                eprintln!("< {}", part);
             }
         }
     }
@@ -255,33 +256,32 @@ impl<'a> CabotBinWrite<'a> {
 
 impl<'a> Write for CabotBinWrite<'a> {
     // may receive headers
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if !self.header_read {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
+        let self_ = Pin::get_mut(self);
+        if !self_.header_read {
             // the first time write is called, all headers are sent
             // in the buffer. there is no need to parse it again.
-            if log_enabled!(Info) || self.verbose {
-                self.display_headers(&buf);
+            if log_enabled!(Info) || self_.verbose {
+                self_.display_headers(&buf);
             }
-            self.header_read = true;
-            Ok(0)
+            self_.header_read = true;
+            Poll::Ready(Ok(0))
         } else {
-            self.out.write(buf)
+            Pin::new(&mut self_.out).poll_write(cx, buf)
         }
     }
 
     /// this function is called when the request is done
-    fn flush(&mut self) -> io::Result<()> {
-        self.out.flush()?;
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        let self_ = Pin::get_mut(self);
+        self_.out.flush();
         info!("End of the query");
-        Ok(())
+        Poll::Ready(Ok(()))
     }
 
-    // Don't implemented unused method
-    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
-    }
-
-    fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        // let self_ = Pin::get_mut(self);
+        // self_.out.close();
+        Poll::Ready(Ok(()))
     }
 }
