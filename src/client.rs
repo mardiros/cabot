@@ -132,8 +132,7 @@ impl Write for CabotLibWrite {
         if !self_.header_read {
             self_.split_headers(&buf);
             self_.header_read = true;
-            //Poll::Ready(Ok(0))
-            Poll::Pending
+            Poll::Ready(Ok(0))
         } else {
             self_.body_buffer.extend_from_slice(&buf);
             Poll::Ready(Ok(buf.len()))
@@ -158,9 +157,10 @@ impl Write for CabotLibWrite {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_std;
 
-    #[test]
-    fn test_build_http_response_from_string() {
+    #[async_std::test]
+    async fn test_build_http_response_from_string() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -172,9 +172,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -185,10 +185,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_header_obsolete_line_folding() {
+    #[async_std::test]
+    async fn test_build_http_header_obsolete_line_folding() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -201,9 +202,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -217,10 +218,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_header_obsolete_line_folding_tab() {
+    #[async_std::test]
+    async fn test_build_http_header_obsolete_line_folding_tab() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -233,9 +235,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -249,10 +251,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_no_response_body() {
+    #[async_std::test]
+    async fn test_build_http_no_response_body() -> std::io::Result<()> {
         let response = vec![
             "HTTP/1.1 302 Moved",
             "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
@@ -260,8 +263,8 @@ mod tests {
         .join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write(response.as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response.as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 302);
@@ -269,5 +272,6 @@ mod tests {
         let headers: &[&str] = &["Location: https://tools.ietf.org/html/rfc7230#section-3.3"];
         assert_eq!(response.headers(), headers);
         assert_eq!(response.body_as_string().unwrap(), "");
+        Ok(())
     }
 }

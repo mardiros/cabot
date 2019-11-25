@@ -12,7 +12,6 @@ use async_std;
 use async_std::fs::OpenOptions;
 use async_std::io::{self, Write};
 use async_std::prelude::*;
-use async_std::task;
 use async_std::task::Context;
 use async_std::task::Poll;
 use clap::{App, Arg};
@@ -205,22 +204,22 @@ pub async fn run() -> CabotResult<()> {
     Ok(())
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     pretty_env_logger::init();
     debug!("Starting cabot");
 
-    task::block_on(async {
-        let res = run();
-        match res.await {
-            Ok(()) => {
-                debug!("Command cabot ended succesfully");
-            }
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        }
-    });
+    run()
+        .await
+        .map(|ok| {
+            debug!("Command cabot ended succesfully");
+            ok
+        })
+        .map_err(|err| {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        })
+        .unwrap();
 }
 
 // Internal Of the Binary

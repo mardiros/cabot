@@ -19,13 +19,14 @@
 //! ## Library:
 //!
 //! ```
+//! use async_std::task;
 //! use cabot::{RequestBuilder, Client};
 //!
 //! let request = RequestBuilder::new("https://www.rust-lang.org/")
 //!     .build()
 //!     .unwrap();
 //! let client = Client::new();
-//! let response = client.execute(&request).await.unwrap();
+//! let response = task::block_on(async {client.execute(&request).await.unwrap()});
 //! assert!(response.body_as_string().unwrap().contains("Rust is blazingly fast and memory-efficient"));
 //!
 //! ```
