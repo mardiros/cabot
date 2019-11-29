@@ -35,6 +35,5 @@ webpki = "^0.19.1"
 webpki-roots = "^0.16.0"
 url = "^1.7.0"
 
-[dependencies.async-std]
-version = "1.1.0"
-features = ["attributes"]
+async-std = {version = "1.1.0", features = ["attributes"]}
+futures-core = "0.3.1"

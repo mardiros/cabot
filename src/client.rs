@@ -5,7 +5,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 
 use async_std::io::{self, Write};
-use async_std::prelude::*;
 use async_std::task::Context;
 use async_std::task::Poll;
 

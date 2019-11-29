@@ -53,6 +53,8 @@ extern crate webpki_roots;
 
 mod dns;
 
+mod asynctls;
+
 pub mod client;
 pub mod constants;
 pub mod errors;
