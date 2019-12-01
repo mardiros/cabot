@@ -3,9 +3,9 @@
 //! <=> is async
 //! <-> is sync
 
+use std::io::{Error as IoError, ErrorKind as IoErrorKind, Read as SyncRead, Write as SyncWrite};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::io::{Error as IoError, ErrorKind as IoErrorKind, Read as SyncRead, Write as SyncWrite};
 use std::vec::Vec;
 
 use async_std::io::{Read, Result as IoResult, Write};
@@ -16,11 +16,9 @@ use rustls::{ClientConfig, ClientSession, ProtocolVersion, Session};
 use webpki::DNSNameRef;
 use webpki_roots;
 
+use super::constants;
 use super::errors::CabotError;
 use super::results::CabotResult;
-
-const BUFFER_PAGE_SIZE: usize = 4096;
-// const RESPONSE_BUFFER_SIZE: usize = 1024;
 
 fn create_config() -> Arc<ClientConfig> {
     let mut config = ClientConfig::new();
@@ -42,7 +40,6 @@ fn create_client(host: &str) -> CabotResult<ClientSession> {
 pub struct TLSStream<'a> {
     tcpstream: &'a mut TcpStream,
     buf_tlsread: Vec<u8>,
-    buf_tlswrite: Vec<u8>,
     tlsclient: ClientSession,
 }
 
@@ -51,23 +48,17 @@ impl<'a> TLSStream<'a> {
         Ok(TLSStream {
             tcpstream,
             buf_tlsread: Vec::new(),
-            buf_tlswrite: Vec::new(),
             tlsclient: create_client(host)?,
         })
     }
     pub async fn handshake(&mut self) -> CabotResult<()> {
         let mut is_handshaking = true;
-        let mut read_buf: [u8; BUFFER_PAGE_SIZE] = [0; BUFFER_PAGE_SIZE];
+        let mut buf_tlswrite: Vec<u8> = Vec::new();
+        let mut read_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
         while is_handshaking {
             while self.tlsclient.wants_write() {
-                let count = self.tlsclient.write_tls(&mut self.buf_tlswrite).unwrap();
-                debug!("Write {} TLS bytes", count);
-                //debug!("{}", self.buf_tlswrite.len());
-                self.tcpstream
-                    .write_all(&self.buf_tlswrite.as_slice()[0..count])
-                    .await?;
-                self.tcpstream.flush().await?;
-                self.buf_tlswrite.clear();
+                let count = self.write(&mut buf_tlswrite).await?;
+                debug!("Write {} TLS bytes during hangshake", count);
             }
             if self.tlsclient.wants_read() {
                 let count = self.read(&mut read_buf).await?;
@@ -116,7 +107,7 @@ impl<'a> Read for TLSStream<'a> {
         buf: &mut [u8],
     ) -> Poll<IoResult<usize>> {
         let self_ = Pin::get_mut(self);
-        let mut tcp_buf: [u8; BUFFER_PAGE_SIZE] = [0; BUFFER_PAGE_SIZE];
+        let mut tcp_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
 
         let count =
             futures_core::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
@@ -138,8 +129,6 @@ impl<'a> Read for TLSStream<'a> {
                             let cnt = self_.tlsclient.read(&mut buf[..]).unwrap();
                             debug!("Read {} Unencrypted bytes", cnt);
                             let _: Vec<_> = self_.buf_tlsread.drain(..cnt).collect();
-                            //debug!("??? {} ???", self_.buf_tlsread.len());
-                            //debug!("??? {} ???", n.len());
                             self_.buf_tlsread.clear();
                             Poll::Ready(Ok(cnt))
                         }
@@ -159,17 +148,22 @@ impl<'a> Read for TLSStream<'a> {
 impl<'a> Write for TLSStream<'a> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<IoResult<usize>> {
         let self_ = Pin::get_mut(self);
+        let mut buf_tlswrite: Vec<u8> = Vec::with_capacity(constants::BUFFER_PAGE_SIZE);
 
-        self_.tlsclient.write_all(&buf).unwrap();
-        let stream = Pin::new(&mut *self_.tcpstream);
+        let ret = buf.len();
 
+        self_.tlsclient.write_all(&buf)?;
+        debug!("Write {} TLS Clear bytes", ret);
+        // debug!("?>> {:?} ", String::from_utf8_lossy(buf));
         while self_.tlsclient.wants_write() {
-            let count = self_.tlsclient.write_tls(&mut self_.buf_tlswrite).unwrap();
-            debug!("Write {} TLS bytes", count);
+            let count = self_.tlsclient.write_tls(&mut buf_tlswrite)?;
+            debug!("Write {} TLS Ciphered bytes", count);
         }
-        let n = futures_core::ready!(stream.poll_write(cx, self_.buf_tlswrite.as_slice()))?;
-        self_.buf_tlswrite.clear();
-        Poll::Ready(Ok(n))
+        let stream = Pin::new(&mut *self_.tcpstream);
+        let count = futures_core::ready!(stream.poll_write(cx, buf_tlswrite.as_slice()))?;
+        buf_tlswrite.clear();
+        debug!("Write {} TLS Ciphered bytes", count);
+        Poll::Ready(Ok(ret))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<IoResult<()>> {

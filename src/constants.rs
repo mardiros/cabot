@@ -12,6 +12,9 @@ pub fn user_agent() -> String {
     format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
 
+// Size of the buffer while reading http socket
+pub const BUFFER_PAGE_SIZE: usize = 2048;
+
 lazy_static! {
     pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new(r"\r\n\r\n").unwrap();
     pub static ref SPLIT_HEADER_BRE: BytesRegex = BytesRegex::new(r"\r\n").unwrap();

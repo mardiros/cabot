@@ -7,13 +7,11 @@ use async_std::net::{SocketAddr, TcpStream};
 use async_std::prelude::*;
 use log::Level::Info;
 
+use super::asynctls::TLSStream;
 use super::constants;
 use super::dns::Resolver;
 use super::request::Request;
-use super::asynctls::TLSStream;
 use super::results::{CabotError, CabotResult};
-
-const BUFFER_PAGE_SIZE: usize = 2048;
 
 #[derive(Debug, PartialEq)]
 enum TransferEncoding {
@@ -130,13 +128,13 @@ impl<'a> HttpDecoder<'a> {
         HttpDecoder {
             writer,
             reader,
-            buffer: Vec::with_capacity(BUFFER_PAGE_SIZE),
+            buffer: Vec::with_capacity(constants::BUFFER_PAGE_SIZE),
             transfer_encoding: TransferEncoding::None,
         }
     }
 
     async fn chunk_read(&mut self) -> IoResult<usize> {
-        let mut buf = [0; BUFFER_PAGE_SIZE];
+        let mut buf = [0; constants::BUFFER_PAGE_SIZE];
         let ret = self.reader.read(&mut buf[..]).await;
         if let Ok(count) = ret {
             if count > 0 {
@@ -267,7 +265,6 @@ async fn log_request(request: &[u8], verbose: bool) {
     }
 }
 
-
 async fn from_http(
     request: &Request,
     client: &mut TcpStream,
@@ -303,7 +300,9 @@ async fn from_https(
 
     debug!("Sending request...");
     tls_client.write_all(&raw_request).await?;
+    debug!("Request sent");
 
+    debug!("Deboding response...");
     let mut http_decoder = HttpDecoder::new(out, &mut tls_client);
     http_decoder.read_write().await?;
     Ok(())
