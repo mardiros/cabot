@@ -274,7 +274,6 @@ impl<'a> Write for CabotBinWrite<'a> {
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
         let self_ = Pin::get_mut(self);
         self_.out.flush();
-        info!("End of the query");
         Poll::Ready(Ok(()))
     }
 

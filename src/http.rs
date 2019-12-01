@@ -302,7 +302,7 @@ async fn from_https(
     tls_client.write_all(&raw_request).await?;
     debug!("Request sent");
 
-    debug!("Deboding response...");
+    debug!("Decoding response...");
     let mut http_decoder = HttpDecoder::new(out, &mut tls_client);
     http_decoder.read_write().await?;
     Ok(())

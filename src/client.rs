@@ -83,7 +83,11 @@ impl CabotLibWrite {
     fn split_headers(&mut self, buf: &[u8]) {
         let headers = String::from_utf8_lossy(buf);
         let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-
+        if headers.len() == 0 {
+            error!("No headers in the response");
+            self.response_builder = ResponseBuilder::new();
+            return
+        }
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);
         let builder = ResponseBuilder::new();
@@ -156,6 +160,7 @@ impl Write for CabotLibWrite {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_std::prelude::*;
     use async_std;
 
     #[async_std::test]
