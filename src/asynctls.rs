@@ -1,7 +1,4 @@
-//! Handle the decrypt TCP async via rust TLS and expose HTTP
-//! TCP <=> TLS <-> HTTP
-//! <=> is async
-//! <-> is sync
+//! decrypt TLS data using rustls on a async-std TcpStream
 
 use std::io::{Error as IoError, ErrorKind as IoErrorKind, Read as SyncRead, Write as SyncWrite};
 use std::pin::Pin;
@@ -37,19 +34,24 @@ fn create_client(host: &str) -> CabotResult<ClientSession> {
     Ok(tlsclient)
 }
 
+/// Stream to read from a ciphered TcpStream and cipher data before
+/// writing the that TcpStream.
+/// Use it like a TcpStream, but call the starttls after calling new.
 pub struct TLSStream<'a> {
     tcpstream: &'a mut TcpStream,
     tlsclient: ClientSession,
 }
 
 impl<'a> TLSStream<'a> {
+    /// Create new TLSStream instance
     pub fn new(tcpstream: &'a mut TcpStream, host: &str) -> CabotResult<Self> {
         Ok(TLSStream {
             tcpstream,
             tlsclient: create_client(host)?,
         })
     }
-    pub async fn handshake(&mut self) -> CabotResult<()> {
+    /// Call it just after creating the sream
+    pub async fn starttls(&mut self) -> CabotResult<()> {
         let mut buf_tlswrite: Vec<u8> = Vec::new();
         let mut read_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
         let mut is_handshaking = true;

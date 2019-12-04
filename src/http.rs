@@ -334,7 +334,7 @@ async fn from_https(
     log_request(&raw_request, verbose).await;
 
     let mut tls_client = TLSStream::new(client, request.host())?;
-    tls_client.handshake().await?;
+    tls_client.starttls().await?;
 
     debug!("Sending request...");
     tls_client.write_all(&raw_request).await?;
