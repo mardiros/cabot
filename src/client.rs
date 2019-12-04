@@ -86,7 +86,7 @@ impl CabotLibWrite {
         if headers.len() == 0 {
             error!("No headers in the response");
             self.response_builder = ResponseBuilder::new();
-            return
+            return;
         }
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);
@@ -160,8 +160,8 @@ impl Write for CabotLibWrite {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_std::prelude::*;
     use async_std;
+    use async_std::prelude::*;
 
     #[async_std::test]
     async fn test_build_http_response_from_string() -> std::io::Result<()> {

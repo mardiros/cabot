@@ -122,9 +122,7 @@ impl<'a> Read for TLSStream<'a> {
             Ok(n) => {
                 if n > 0 {
                     debug!("Read {} TCP bytes", n);
-                    let count = self_
-                        .tlsclient
-                        .read_tls(&mut &tcp_buf[..n])?;
+                    let count = self_.tlsclient.read_tls(&mut &tcp_buf[..n])?;
                     debug!("Decode {} TLS bytes", count);
 
                     let packets = self_.tlsclient.process_new_packets();

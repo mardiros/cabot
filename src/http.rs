@@ -21,6 +21,13 @@ enum TransferEncoding {
     None,
 }
 
+#[derive(Debug, PartialEq)]
+enum TransferEncodingStatus {
+    ReadingHeader,
+    ChunkHeader,
+    ReadingBody(usize),
+}
+
 impl From<&[u8]> for TransferEncoding {
     fn from(hdr: &[u8]) -> Self {
         let hdr = String::from_utf8_lossy(hdr);
@@ -37,90 +44,7 @@ struct HttpDecoder<'a> {
     writer: &'a mut (dyn Write + Unpin),
     buffer: Vec<u8>,
     transfer_encoding: TransferEncoding,
-}
-
-impl<'a> HttpDecoder<'a> {
-    async fn process_headers(&mut self) -> Option<usize> {
-        let ret = {
-            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
-                .splitn(self.buffer.as_slice(), 2)
-                .collect();
-            if resp_header.len() == 2 {
-                // We have headers
-                let headers = resp_header.get(0).unwrap();
-                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
-                    if let Some(tenc) = header.get(1) {
-                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
-                    }
-                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
-                    if let Some(clength) = header.get(1) {
-                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
-                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
-                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
-                    }
-                }
-                let resp = headers.len();
-                self.writer.write(headers).await.unwrap();
-                Some(resp + 4) // + CRLF CRLF
-            } else {
-                None
-            }
-        };
-        if let Some(to_drain) = ret {
-            let buffer = self.buffer.drain(to_drain..).collect();
-            self.buffer = buffer;
-            info!("Headers read");
-        }
-        ret
-    }
-    async fn process_chunk(&mut self) -> IoResult<bool> {
-        let mut read_chunk = true;
-        let mut read_size = 0;
-        let mut header_len: usize;
-        while read_chunk {
-            header_len = 0;
-            {
-                // we read the chunk size to drain
-                let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
-                    .splitn(self.buffer.as_slice(), 2)
-                    .collect();
-                if header.len() == 2 {
-                    if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
-                        if let Some(size) = header.get(1) {
-                            let size = size.as_bytes();
-                            header_len = size.len() + 2;
-                            let size = String::from_utf8_lossy(size).into_owned();
-                            read_size = usize::from_str_radix(size.as_str(), 16).unwrap();
-                            read_chunk = false;
-                        }
-                    } else {
-                        // else return Error
-                        break;
-                    }
-                }
-            }
-
-            if read_size == 0 {
-                self.buffer.clear(); // should we check that it is '0\r\n' ?
-                return Ok(true);
-            }
-
-            let buffer: Vec<u8> = self.buffer.drain(header_len..).collect();
-            self.buffer = buffer;
-
-            if !read_chunk && self.buffer.len() >= read_size + 2 {
-                let mut buffer: Vec<u8> = self.buffer.drain(read_size..).collect();
-
-                self.writer.write(self.buffer.as_slice()).await?;
-
-                let buffer2 = buffer.drain(2..).collect(); // CRLF
-                self.buffer = buffer2;
-                read_chunk = true;
-                read_size = 0;
-            }
-        }
-        return Ok(false);
-    }
+    transfer_encoding_status: TransferEncodingStatus,
 }
 
 impl<'a> HttpDecoder<'a> {
@@ -130,6 +54,7 @@ impl<'a> HttpDecoder<'a> {
             reader,
             buffer: Vec::with_capacity(constants::BUFFER_PAGE_SIZE),
             transfer_encoding: TransferEncoding::None,
+            transfer_encoding_status: TransferEncodingStatus::ReadingHeader,
         }
     }
 
@@ -146,11 +71,7 @@ impl<'a> HttpDecoder<'a> {
     async fn read_write_headers(&mut self) -> IoResult<()> {
         info!("Reading headers");
         loop {
-            let count = self.chunk_read().await?;
-            info!("Count: {}", count);
-            if count == 0 {
-                break;
-            }
+            let _count = self.chunk_read().await?;
             if let Some(_) = self.process_headers().await {
                 break;
             }
@@ -162,7 +83,6 @@ impl<'a> HttpDecoder<'a> {
         loop {
             self.writer.write(self.buffer.as_slice()).await.unwrap();
             self.buffer.clear();
-
             let cnt = self.chunk_read().await?;
             if cnt == 0 {
                 break;
@@ -182,6 +102,7 @@ impl<'a> HttpDecoder<'a> {
                 break;
             }
             read_count = read_count + self.chunk_read().await?;
+            warn!("< {}", read_count);
         }
         Ok(())
     }
@@ -228,6 +149,123 @@ impl<'a> HttpDecoder<'a> {
         self.read_write_headers().await?;
         self.read_write_body().await?;
         self.writer.flush().await
+    }
+
+    async fn process_headers(&mut self) -> Option<usize> {
+        let ret = {
+            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
+                .splitn(self.buffer.as_slice(), 2)
+                .collect();
+            if resp_header.len() == 2 {
+                // We have headers
+                let headers = resp_header.get(0).unwrap();
+                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
+                    if let Some(tenc) = header.get(1) {
+                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
+                    }
+                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
+                    if let Some(clength) = header.get(1) {
+                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
+                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
+                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
+                    }
+                }
+                let resp = headers.len();
+                self.writer.write(headers).await.unwrap();
+                Some(resp + 4) // + CRLF CRLF
+            } else {
+                None
+            }
+        };
+        if let Some(to_drain) = ret {
+            let buffer = self.buffer.drain(to_drain..).collect();
+            self.buffer = buffer;
+            info!("End of Headers readched");
+            debug!("Transfer encoding: {:?}", self.transfer_encoding);
+            debug!("{:?}", String::from_utf8_lossy(self.buffer.as_slice()));
+        }
+        ret
+    }
+    async fn process_chunk(&mut self) -> IoResult<bool> {
+        debug!(
+            "transfer_encoding_status: {:?}",
+            self.transfer_encoding_status
+        );
+        let mut can_process_buffer = self.buffer.len() > 0;
+        let mut body_chunk_size = 0;
+        let mut header_len: usize;
+        while can_process_buffer {
+            header_len = 0;
+            if self.transfer_encoding_status == TransferEncodingStatus::ReadingHeader {
+                // we read the chunk size to drain
+                let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
+                    .splitn(self.buffer.as_slice(), 2)
+                    .collect();
+                if header.len() == 2 {
+                    if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
+                        if let Some(size) = header.get(1) {
+                            let size = size.as_bytes();
+                            header_len = size.len() + 2;
+                            let size = String::from_utf8_lossy(size).into_owned();
+                            body_chunk_size = usize::from_str_radix(size.as_str(), 16).unwrap();
+                            self.transfer_encoding_status = TransferEncodingStatus::ChunkHeader;
+                        }
+                    } else {
+                        // else return Error
+                        // break;
+                    }
+                } else {
+                    debug!(
+                        "Chunked not complete: {}",
+                        String::from_utf8_lossy(self.buffer.as_slice())
+                    );
+                }
+            }
+
+            if self.transfer_encoding_status == TransferEncodingStatus::ChunkHeader {
+                if body_chunk_size == 0 {
+                    debug!(
+                        "0 chunked size received: {}",
+                        String::from_utf8_lossy(self.buffer.as_slice())
+                    );
+                    self.buffer.clear(); // should we check that it is '0\r\n' ?
+                    return Ok(true);
+                }
+
+                debug!(
+                    "Before header cleanup: {}",
+                    String::from_utf8_lossy(self.buffer.as_slice())
+                );
+                let buffer: Vec<u8> = self.buffer.drain(header_len..).collect();
+                self.buffer = buffer;
+                debug!(
+                    "After header cleanup: {}",
+                    String::from_utf8_lossy(self.buffer.as_slice())
+                );
+                self.transfer_encoding_status =
+                    TransferEncodingStatus::ReadingBody(body_chunk_size);
+            }
+
+            if let TransferEncodingStatus::ReadingBody(body_chunk_size) =
+                self.transfer_encoding_status
+            {
+                error!("!! {} > {}", self.buffer.len(), body_chunk_size);
+                if self.buffer.len() > body_chunk_size {
+                    let mut buffer: Vec<u8> = self.buffer.drain(body_chunk_size..).collect();
+                    self.writer.write(self.buffer.as_slice()).await?;
+
+                    let buffer2 = buffer.drain(2..).collect(); // CRLF
+                    self.buffer = buffer2;
+                    self.transfer_encoding_status = TransferEncodingStatus::ReadingHeader;
+                } else {
+                    can_process_buffer = false;
+                }
+            } else {
+                can_process_buffer = false;
+            }
+        }
+
+        return Ok(false);
     }
 }
 
