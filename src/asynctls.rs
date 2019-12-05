@@ -120,27 +120,26 @@ impl<'a> Read for TLSStream<'a> {
             futures_core::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
 
         match count {
-            Err(err) => Poll::Ready(Err(err)),
+            Err(err) => {
+                error!("Received an error {:?}", err);
+                Poll::Ready(Err(err))
+            }
             Ok(n) => {
-                if n > 0 {
-                    debug!("Read {} TCP bytes", n);
-                    let count = self_.tlsclient.read_tls(&mut &tcp_buf[..n])?;
-                    debug!("Decode {} TLS bytes", count);
+                debug!("Read {} TCP bytes", n);
+                let count = self_.tlsclient.read_tls(&mut &tcp_buf[..n])?;
+                debug!("Decode {} TLS bytes", count);
 
-                    let packets = self_.tlsclient.process_new_packets();
-                    match packets {
-                        Ok(_) => {
-                            let cnt = self_.tlsclient.read(&mut buf[..]).unwrap();
-                            debug!("Read {} Unencrypted bytes", cnt);
-                            Poll::Ready(Ok(cnt))
-                        }
-                        Err(err) => Poll::Ready(Err(IoError::new(
-                            IoErrorKind::InvalidData,
-                            format!("{:?}", err),
-                        ))),
+                let packets = self_.tlsclient.process_new_packets();
+                match packets {
+                    Ok(_) => {
+                        let cnt = self_.tlsclient.read(&mut buf[..]).unwrap();
+                        debug!("Read {} Unencrypted bytes", cnt);
+                        Poll::Ready(Ok(cnt))
                     }
-                } else {
-                    Poll::Pending
+                    Err(err) => Poll::Ready(Err(IoError::new(
+                        IoErrorKind::InvalidData,
+                        format!("{:?}", err),
+                    ))),
                 }
             }
         }
