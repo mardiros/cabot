@@ -250,5 +250,4 @@ mod tests {
         assert_eq!(response.body(), Some(body));
         assert_eq!(response.body_as_string().unwrap(), "{}");
     }
-
 }

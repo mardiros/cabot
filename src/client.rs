@@ -1,10 +1,12 @@
 //! The HTTP Client that perform query
-
 use std::collections::HashMap;
-use std::fmt::Arguments;
-use std::io::{self, Write};
 use std::mem;
 use std::net::SocketAddr;
+use std::pin::Pin;
+
+use async_std::io::{self, Write};
+use async_std::task::Context;
+use async_std::task::Poll;
 
 use super::constants;
 use super::http;
@@ -48,7 +50,7 @@ impl Client {
 
     /// Execute the query [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
-    pub fn execute(&self, request: &Request) -> CabotResult<Response> {
+    pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
         let mut out = CabotLibWrite::new();
         http::http_query(
             &request,
@@ -57,7 +59,8 @@ impl Client {
             self.verbose,
             self.ipv4,
             self.ipv6,
-        )?;
+        )
+        .await?;
         out.response()
     }
 }
@@ -80,7 +83,11 @@ impl CabotLibWrite {
     fn split_headers(&mut self, buf: &[u8]) {
         let headers = String::from_utf8_lossy(buf);
         let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-
+        if headers.len() == 0 {
+            error!("No headers in the response");
+            self.response_builder = ResponseBuilder::new();
+            return;
+        }
         let status_line = headers.remove(0);
         debug!("Adding status line {}", status_line);
         let builder = ResponseBuilder::new();
@@ -123,41 +130,41 @@ impl CabotLibWrite {
 }
 
 impl Write for CabotLibWrite {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if !self.header_read {
-            self.split_headers(&buf);
-            self.header_read = true;
-            Ok(0)
+    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
+        let self_ = Pin::get_mut(self);
+        if !self_.header_read {
+            self_.split_headers(&buf);
+            self_.header_read = true;
+            Poll::Ready(Ok(0))
         } else {
-            self.body_buffer.extend_from_slice(&buf);
-            Ok(buf.len())
+            self_.body_buffer.extend_from_slice(&buf);
+            Poll::Ready(Ok(buf.len()))
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        info!("Adding body {:?}", self.body_buffer);
-        let builder = mem::replace(&mut self.response_builder, ResponseBuilder::new());
-        self.response_builder = builder.set_body(self.body_buffer.as_slice());
-        Ok(())
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        let self_ = Pin::get_mut(self);
+        info!("Adding body {:?}", self_.body_buffer);
+        let builder = mem::replace(&mut self_.response_builder, ResponseBuilder::new());
+        self_.response_builder = builder.set_body(self_.body_buffer.as_slice());
+        Poll::Ready(Ok(()))
     }
 
     // Don't implemented unused method
 
-    fn write_all(&mut self, _: &[u8]) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
-    }
-
-    fn write_fmt(&mut self, _: Arguments) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Not Implemented"))
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
+        Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "Not Implemented")))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_std;
+    use async_std::prelude::*;
 
-    #[test]
-    fn test_build_http_response_from_string() {
+    #[async_std::test]
+    async fn test_build_http_response_from_string() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -169,9 +176,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -182,10 +189,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_header_obsolete_line_folding() {
+    #[async_std::test]
+    async fn test_build_http_header_obsolete_line_folding() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -198,9 +206,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -214,10 +222,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_header_obsolete_line_folding_tab() {
+    #[async_std::test]
+    async fn test_build_http_header_obsolete_line_folding_tab() -> std::io::Result<()> {
         let response = [
             vec![
                 "HTTP/1.1 200 Ok",
@@ -230,9 +239,9 @@ mod tests {
         ];
 
         let mut out = CabotLibWrite::new();
-        out.write(response[0].as_bytes()).unwrap();
-        out.write(response[1].as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response[0].as_bytes()).await.unwrap();
+        out.write(response[1].as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 200);
@@ -246,10 +255,11 @@ mod tests {
             response.body_as_string().unwrap(),
             "Hello World!".to_owned()
         );
+        Ok(())
     }
 
-    #[test]
-    fn test_build_http_no_response_body() {
+    #[async_std::test]
+    async fn test_build_http_no_response_body() -> std::io::Result<()> {
         let response = vec![
             "HTTP/1.1 302 Moved",
             "Location: https://tools.ietf.org/html/rfc7230#section-3.3",
@@ -257,8 +267,8 @@ mod tests {
         .join("\r\n");
 
         let mut out = CabotLibWrite::new();
-        out.write(response.as_bytes()).unwrap();
-        out.flush().unwrap();
+        out.write(response.as_bytes()).await.unwrap();
+        out.flush().await.unwrap();
         let response = out.response().unwrap();
         assert_eq!(response.http_version(), "HTTP/1.1");
         assert_eq!(response.status_code(), 302);
@@ -266,6 +276,6 @@ mod tests {
         let headers: &[&str] = &["Location: https://tools.ietf.org/html/rfc7230#section-3.3"];
         assert_eq!(response.headers(), headers);
         assert_eq!(response.body_as_string().unwrap(), "");
+        Ok(())
     }
-
 }

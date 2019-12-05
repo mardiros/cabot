@@ -10,7 +10,7 @@ license = "BSD-3-Clause"
 documentation = "https://docs.rs/crate/cabot"
 #homepage = "https://github.com/mardiros/cabot"
 repository = "https://github.com/mardiros/cabot"
-
+edition = "2018"
 
 [lib]
 name = "cabot"
@@ -34,3 +34,6 @@ rustls = "^0.15.2"
 webpki = "^0.19.1"
 webpki-roots = "^0.16.0"
 url = "^1.7.0"
+
+async-std = {version = "1.1.0", features = ["attributes"]}
+futures-core = "0.3.1"
