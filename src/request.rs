@@ -11,7 +11,7 @@
 //!     .build()
 //!     .unwrap();
 //!     let attempt = "POST / HTTP/1.1\r\nContent-Type: \
-//!                    application/json\r\nUser-Agent: cabot/0.3.0\r\n\
+//!                    application/json\r\nUser-Agent: cabot/0.4.0\r\n\
 //!                    Host: localhost\r\nConnection: \
 //!                    close\r\nContent-Length: 2\r\n\r\n{}";
 //! assert_eq!(request.to_string(), attempt.to_string());

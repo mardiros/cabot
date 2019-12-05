@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## cabot 0.4.0 2019-12-05
+
+ * Use `async-std` instead of `std`
+ * Stream https ouput while deciphering, remove useless buffering
+
 ## cabot 0.3.0 2019-07-11
 
  * Implement `Transfer-Encoding: chunked`.
