@@ -370,7 +370,7 @@ pub async fn http_query(
         None => {
             info!("Fetch authority {} using resolver", authority);
             let resolver = Resolver::new(verbose);
-            resolver.get_addr(authority, ipv4, ipv6)?
+            resolver.get_addr(authority, ipv4, ipv6).await?
         }
     };
 
