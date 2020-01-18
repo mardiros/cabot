@@ -1,8 +1,9 @@
 //! Low level and internal http and https implementation.
 
 use std::collections::HashMap;
+use std::time::Duration;
 
-use async_std::io::{stderr, Read, Result as IoResult, Write};
+use async_std::io::{self, stderr, Read, Result as IoResult, Write};
 use async_std::net::{SocketAddr, TcpStream};
 use async_std::prelude::*;
 use log::Level::Info;
@@ -59,14 +60,17 @@ impl<'a> HttpDecoder<'a> {
     }
 
     async fn chunk_read(&mut self) -> IoResult<usize> {
-        let mut buf = [0; constants::BUFFER_PAGE_SIZE];
-        let ret = self.reader.read(&mut buf[..]).await;
-        if let Ok(count) = ret {
-            if count > 0 {
-                self.buffer.extend_from_slice(&buf[0..count]);
+        let ret = io::timeout(Duration::from_secs(5), async {
+            let mut buf = [0; constants::BUFFER_PAGE_SIZE];
+            let ret = self.reader.read(&mut buf[..]).await;
+            if let Ok(count) = ret {
+                if count > 0 {
+                    self.buffer.extend_from_slice(&buf[0..count]);
+                }
             }
-        }
-        ret
+            ret
+        });
+        ret.await
     }
     async fn read_write_headers(&mut self) -> IoResult<()> {
         info!("Reading headers");
