@@ -379,7 +379,10 @@ pub async fn http_query(
     };
 
     info!("Connecting to {}", addr);
-    let mut client = TcpStream::connect(addr).await?;
+    let mut client = io::timeout(Duration::from_secs(5), async {
+        TcpStream::connect(addr).await
+    })
+    .await?;
 
     // client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
