@@ -33,3 +33,8 @@ There are many projects that should be used instead of mine.
 
 See also [a smoke tested lists of http client in rust](https://medium.com/@shnatsel/smoke-testing-rust-http-clients-b8f2ee5db4e6)
 for more choice.
+
+## What this name ?
+
+A cabot is not a certificate authority bot, it is a french word for
+a dog, a mutt actually. You throw the ball, he do the rest.
