@@ -206,6 +206,7 @@ pub async fn run() -> CabotResult<()> {
 
 #[async_std::main]
 async fn main() {
+    #[cfg(feature = "pretty_log")]
     pretty_env_logger::init();
     debug!("Starting cabot");
 
