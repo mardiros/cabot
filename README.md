@@ -19,6 +19,20 @@ but use [rustls](https://crates.io/crates/rustls) instead.
 
 Use `-h` for more options
 
+## Features
+
+There is no default features set.
+
+ * `pretty_log`: add pretty_env_logger dependency.
+
+If set, pretty_env_logger is initalize for the CLI command,
+it has no effect as using cabot as a library.
+
+Usage:
+
+    RUST_LOG=cabot cargo run --features=pretty_log  -- <url>
+
+
 ## License
 
 BSD 3-Clause License

@@ -22,11 +22,14 @@ name = "cabot"
 path = "src/bin.rs"
 doc = false
 
+[features]
+default = []
+pretty_log = ["pretty_env_logger"]
+
 [dependencies]
 
 clap = "2.33.0"
 log = "0.4.8"
-pretty_env_logger = "0.3.1"
 lazy_static = "1.4.0"
 regex = "1.3.1"
 
@@ -37,3 +40,5 @@ url = "1.7.0"
 
 async-std = {version = "1.1.0", features = ["attributes"]}
 futures-core = "0.3.1"
+
+pretty_env_logger = { version = "0.3.1", optional = true }
