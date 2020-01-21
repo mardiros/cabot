@@ -395,7 +395,11 @@ pub async fn http_query(
     let mut client = io::timeout(Duration::from_millis(connect_timeout), async {
         TcpStream::connect(addr).await
     })
-    .await?;
+    .await
+    .map_err(|err| match err.kind() {
+        io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Connection Timeout".to_owned()),
+        _ => err,
+    })?;
 
     // client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
