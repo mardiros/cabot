@@ -76,7 +76,10 @@ impl<'a> HttpDecoder<'a> {
             }
             ret
         });
-        ret.await
+        ret.await.map_err(|err| match err.kind() {
+            io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Read Timeout".to_owned()),
+            _ => err,
+        })
     }
     async fn read_write_headers(&mut self) -> IoResult<()> {
         info!("Reading headers");
