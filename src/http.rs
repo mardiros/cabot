@@ -46,21 +46,27 @@ struct HttpDecoder<'a> {
     buffer: Vec<u8>,
     transfer_encoding: TransferEncoding,
     transfer_encoding_status: TransferEncodingStatus,
+    read_timeout: Duration,
 }
 
 impl<'a> HttpDecoder<'a> {
-    fn new(writer: &'a mut (dyn Write + Unpin), reader: &'a mut (dyn Read + Unpin)) -> Self {
+    fn new(
+        writer: &'a mut (dyn Write + Unpin),
+        reader: &'a mut (dyn Read + Unpin),
+        read_timeout: u64,
+    ) -> Self {
         HttpDecoder {
             writer,
             reader,
             buffer: Vec::with_capacity(constants::BUFFER_PAGE_SIZE),
             transfer_encoding: TransferEncoding::None,
             transfer_encoding_status: TransferEncodingStatus::ReadingHeader,
+            read_timeout: Duration::from_millis(read_timeout),
         }
     }
 
     async fn chunk_read(&mut self) -> IoResult<usize> {
-        let ret = io::timeout(Duration::from_secs(5), async {
+        let ret = io::timeout(self.read_timeout, async {
             let mut buf = [0; constants::BUFFER_PAGE_SIZE];
             let ret = self.reader.read(&mut buf[..]).await;
             if let Ok(count) = ret {
@@ -312,6 +318,7 @@ async fn from_http(
     client: &mut TcpStream,
     out: &mut (dyn Write + Unpin),
     verbose: bool,
+    read_timeout: u64,
 ) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
@@ -322,7 +329,7 @@ async fn from_http(
 
     debug!("Reading response headers...");
 
-    let mut http_decoder = HttpDecoder::new(out, client);
+    let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
     http_decoder.read_write().await?;
     Ok(())
 }
@@ -332,6 +339,7 @@ async fn from_https(
     client: &mut TcpStream,
     out: &mut (dyn Write + Unpin),
     verbose: bool,
+    read_timeout: u64,
 ) -> CabotResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
@@ -345,7 +353,7 @@ async fn from_https(
     debug!("Request sent");
 
     debug!("Decoding response...");
-    let mut http_decoder = HttpDecoder::new(out, &mut tls_client);
+    let mut http_decoder = HttpDecoder::new(out, &mut tls_client, read_timeout);
     http_decoder.read_write().await?;
     Ok(())
 }
@@ -357,6 +365,9 @@ pub async fn http_query(
     verbose: bool,
     ipv4: bool,
     ipv6: bool,
+    dns_timeout: u64,
+    connect_timeout: u64,
+    read_timeout: u64,
 ) -> CabotResult<()> {
     debug!(
         "HTTP Query {} {}",
@@ -374,12 +385,14 @@ pub async fn http_query(
         None => {
             info!("Fetch authority {} using resolver", authority);
             let resolver = Resolver::new(verbose);
-            resolver.get_addr(authority, ipv4, ipv6).await?
+            resolver
+                .get_addr(authority, ipv4, ipv6, dns_timeout)
+                .await?
         }
     };
 
     info!("Connecting to {}", addr);
-    let mut client = io::timeout(Duration::from_secs(5), async {
+    let mut client = io::timeout(Duration::from_millis(connect_timeout), async {
         TcpStream::connect(addr).await
     })
     .await?;
@@ -387,8 +400,8 @@ pub async fn http_query(
     // client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
 
     match request.scheme() {
-        "http" => from_http(request, &mut client, &mut out, verbose).await?,
-        "https" => from_https(request, &mut client, &mut out, verbose).await?,
+        "http" => from_http(request, &mut client, &mut out, verbose, read_timeout).await?,
+        "https" => from_https(request, &mut client, &mut out, verbose, read_timeout).await?,
         _ => {
             return Err(CabotError::SchemeError(format!(
                 "Unrecognized scheme {}",

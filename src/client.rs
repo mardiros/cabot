@@ -21,6 +21,9 @@ pub struct Client {
     ipv4: bool,
     ipv6: bool,
     authorities: HashMap<String, SocketAddr>,
+    read_timeout: u64,
+    connect_timeout: u64,
+    dns_timeout: u64,
 }
 
 impl Client {
@@ -31,6 +34,9 @@ impl Client {
             ipv4: true,
             ipv6: true,
             authorities: HashMap::new(),
+            dns_timeout: 5_000,
+            connect_timeout: 15_000,
+            read_timeout: 10_000,
         }
     }
 
@@ -48,6 +54,32 @@ impl Client {
             .insert(authority.to_owned(), sock_addr.clone());
     }
 
+    /// Set the timeout for DNS resolution in seconds.
+    pub fn set_dns_timeout(&mut self, timeout: u64) {
+        self.dns_timeout = timeout * 1000;
+    }
+    /// Set the connect socket timeout in seconds.
+    pub fn set_connect_timeout(&mut self, timeout: u64) {
+        self.connect_timeout = timeout * 1000;
+    }
+    /// Set the read socket timeout in seconds.
+    pub fn set_read_timeout(&mut self, timeout: u64) {
+        self.read_timeout = timeout * 1000;
+    }
+
+    /// Set the timeout for DNS resolution in milliseconds.
+    pub fn set_dns_timeout_ms(&mut self, timeout: u64) {
+        self.dns_timeout = timeout;
+    }
+    /// Set the connect socket timeout in milliseconds.
+    pub fn set_connect_timeout_ms(&mut self, timeout: u64) {
+        self.connect_timeout = timeout;
+    }
+    /// Set the read socket timeout in milliseconds.
+    pub fn set_read_timeout_ms(&mut self, timeout: u64) {
+        self.read_timeout = timeout;
+    }
+
     /// Execute the query [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
     pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
@@ -59,6 +91,9 @@ impl Client {
             self.verbose,
             self.ipv4,
             self.ipv6,
+            self.dns_timeout,
+            self.connect_timeout,
+            self.read_timeout,
         )
         .await?;
         out.response()

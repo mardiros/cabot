@@ -89,6 +89,27 @@ pub async fn run() -> CabotResult<()> {
                 .help("The user-agent HTTP header to use"),
         )
         .arg(
+            Arg::with_name("DNS_TIMEOUT")
+                .long("dns-lookup-timeout")
+                .takes_value(true)
+                .default_value("5")
+                .help("timeout for the dns lookup resolution in seconds"),
+        )
+        .arg(
+            Arg::with_name("CONNECT_TIMEOUT")
+                .long("connect-timeout")
+                .takes_value(true)
+                .default_value("15")
+                .help("timeout for the tcp connection"),
+        )
+        .arg(
+            Arg::with_name("READ_TIMEOUT")
+                .long("read-timeout")
+                .takes_value(true)
+                .default_value("10")
+                .help("timeout for the tcp read in seconds"),
+        )
+        .arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
@@ -173,6 +194,16 @@ pub async fn run() -> CabotResult<()> {
 
     let request = builder.build()?;
 
+    let dns_timeout = u64::from_str_radix(matches.value_of("DNS_TIMEOUT").unwrap(), 10)
+        .expect("DNS_TIMEOUT must be an integer")
+        * 1_000;
+    let connect_timeout = u64::from_str_radix(matches.value_of("CONNECT_TIMEOUT").unwrap(), 10)
+        .expect("CONNECT_TIMEOUT must be an integer")
+        * 1_000;
+    let read_timeout = u64::from_str_radix(matches.value_of("READ_TIMEOUT").unwrap(), 10)
+        .expect("READ_TIMEOUT must be an integer")
+        * 1_000;
+
     if let Some(path) = matches.value_of("FILE") {
         let mut f = OpenOptions::new()
             .write(true)
@@ -188,6 +219,9 @@ pub async fn run() -> CabotResult<()> {
             verbose,
             ipv4,
             ipv6,
+            dns_timeout,
+            connect_timeout,
+            read_timeout,
         )
         .await?
     } else {
@@ -198,6 +232,9 @@ pub async fn run() -> CabotResult<()> {
             verbose,
             ipv4,
             ipv6,
+            dns_timeout,
+            connect_timeout,
+            read_timeout,
         )
         .await?
     };

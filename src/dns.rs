@@ -22,10 +22,11 @@ impl Resolver {
         authority: &str,
         ipv4: bool,
         ipv6: bool,
+        dns_timeout: u64,
     ) -> CabotResult<SocketAddr> {
         debug!("Resolving TCP Endpoint for authority {}", authority);
 
-        let addrs = io::timeout(Duration::from_secs(10), async {
+        let addrs = io::timeout(Duration::from_millis(dns_timeout), async {
             authority.to_socket_addrs().await
         })
         .await?;
