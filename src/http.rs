@@ -401,8 +401,6 @@ pub async fn http_query(
         _ => err,
     })?;
 
-    // client.set_read_timeout(Some(Duration::new(5, 0))).unwrap();
-
     match request.scheme() {
         "http" => from_http(request, &mut client, &mut out, verbose, read_timeout).await?,
         "https" => from_https(request, &mut client, &mut out, verbose, read_timeout).await?,
