@@ -190,17 +190,6 @@ pub async fn run() -> CabotResult<()> {
         None => HashMap::new(),
     };
 
-    let mut builder = RequestBuilder::new(url)
-        .set_http_method(http_method)
-        .set_user_agent(ua)
-        .add_headers(&headers.as_slice());
-
-    if body.is_some() {
-        builder = builder.set_body_as_str(body.unwrap());
-    }
-
-    let request = builder.build()?;
-
     let dns_timeout = u64::from_str_radix(matches.value_of("DNS_LOOKUP_TIMEOUT").unwrap(), 10)
         .expect("DNS_LOOKUP_TIMEOUT must be an integer")
         * 1_000;
@@ -213,6 +202,17 @@ pub async fn run() -> CabotResult<()> {
     let request_timeout = u64::from_str_radix(matches.value_of("REQUEST_TIMEOUT").unwrap(), 10)
         .expect("REQUEST_TIMEOUT must be an integer")
         * 1_000;
+
+    let mut builder = RequestBuilder::new(url)
+        .set_http_method(http_method)
+        .set_user_agent(ua)
+        .add_headers(&headers.as_slice());
+
+    if body.is_some() {
+        builder = builder.set_body_as_str(body.unwrap());
+    }
+
+    let request = builder.build()?;
 
     if let Some(path) = matches.value_of("FILE") {
         let mut f = OpenOptions::new()
@@ -233,6 +233,7 @@ pub async fn run() -> CabotResult<()> {
             connect_timeout,
             read_timeout,
             request_timeout,
+            constants::NUMBER_OF_REDIRECT,
         )
         .await?
     } else {
@@ -247,6 +248,7 @@ pub async fn run() -> CabotResult<()> {
             connect_timeout,
             read_timeout,
             request_timeout,
+            constants::NUMBER_OF_REDIRECT,
         )
         .await?
     };

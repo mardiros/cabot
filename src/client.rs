@@ -25,6 +25,7 @@ pub struct Client {
     connect_timeout: u64,
     dns_timeout: u64,
     request_timeout: u64,
+    max_redir: u8,
 }
 
 impl Client {
@@ -39,6 +40,7 @@ impl Client {
             connect_timeout: 15_000,
             read_timeout: 10_000,
             request_timeout: 30_000,
+            max_redir: constants::NUMBER_OF_REDIRECT,
         }
     }
 
@@ -91,6 +93,11 @@ impl Client {
         self.request_timeout = timeout;
     }
 
+    /// Set the number of redirection to follow before giving up and return it.
+    pub fn set_max_redir(&mut self, max_redir: u8) {
+        self.max_redir = max_redir;
+    }
+
     /// Execute the query [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
     pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
@@ -106,6 +113,7 @@ impl Client {
             self.connect_timeout,
             self.read_timeout,
             self.request_timeout,
+            self.max_redir,
         )
         .await?;
         out.response()
