@@ -110,6 +110,13 @@ pub async fn run() -> CabotResult<()> {
                 .help("timeout for the tcp read in seconds"),
         )
         .arg(
+            Arg::with_name("REQUEST_TIMEOUT")
+                .long("timeout")
+                .takes_value(true)
+                .default_value("30")
+                .help("timeout for the whole http request in seconds"),
+        )
+        .arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
@@ -203,6 +210,9 @@ pub async fn run() -> CabotResult<()> {
     let read_timeout = u64::from_str_radix(matches.value_of("READ_TIMEOUT").unwrap(), 10)
         .expect("READ_TIMEOUT must be an integer")
         * 1_000;
+    let request_timeout = u64::from_str_radix(matches.value_of("REQUEST_TIMEOUT").unwrap(), 10)
+        .expect("REQUEST_TIMEOUT must be an integer")
+        * 1_000;
 
     if let Some(path) = matches.value_of("FILE") {
         let mut f = OpenOptions::new()
@@ -222,6 +232,7 @@ pub async fn run() -> CabotResult<()> {
             dns_timeout,
             connect_timeout,
             read_timeout,
+            request_timeout,
         )
         .await?
     } else {
@@ -235,6 +246,7 @@ pub async fn run() -> CabotResult<()> {
             dns_timeout,
             connect_timeout,
             read_timeout,
+            request_timeout,
         )
         .await?
     };

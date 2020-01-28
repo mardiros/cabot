@@ -24,6 +24,7 @@ pub struct Client {
     read_timeout: u64,
     connect_timeout: u64,
     dns_timeout: u64,
+    request_timeout: u64,
 }
 
 impl Client {
@@ -37,6 +38,7 @@ impl Client {
             dns_timeout: 5_000,
             connect_timeout: 15_000,
             read_timeout: 10_000,
+            request_timeout: 30_000,
         }
     }
 
@@ -66,6 +68,10 @@ impl Client {
     pub fn set_read_timeout(&mut self, timeout: u64) {
         self.read_timeout = timeout * 1000;
     }
+    /// Set the request timeout in milliseconds.
+    pub fn set_request_timeout(&mut self, timeout: u64) {
+        self.request_timeout = timeout * 1000;
+    }
 
     /// Set the timeout for DNS resolution in milliseconds.
     pub fn set_dns_timeout_ms(&mut self, timeout: u64) {
@@ -78,6 +84,11 @@ impl Client {
     /// Set the read socket timeout in milliseconds.
     pub fn set_read_timeout_ms(&mut self, timeout: u64) {
         self.read_timeout = timeout;
+    }
+
+    /// Set the request timeout in milliseconds.
+    pub fn set_request_timeout_ms(&mut self, timeout: u64) {
+        self.request_timeout = timeout;
     }
 
     /// Execute the query [Request](../request/struct.Request.html) and
@@ -94,6 +105,7 @@ impl Client {
             self.dns_timeout,
             self.connect_timeout,
             self.read_timeout,
+            self.request_timeout,
         )
         .await?;
         out.response()
