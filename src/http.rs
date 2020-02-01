@@ -334,14 +334,25 @@ async fn from_http(
     debug!("Reading response headers...");
 
     let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
-    io::timeout(Duration::from_millis(request_timeout), async {
-        http_decoder.read_write().await
-    })
-    .await
-    .map_err(|err| match err.kind() {
-        io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Request Timeout".to_owned()),
-        _ => err,
-    })?;
+
+    if request_timeout > 0 {
+        io::timeout(Duration::from_millis(request_timeout), async {
+            http_decoder.read_write().await
+        })
+        .await
+        .map_err(|err| match err.kind() {
+            io::ErrorKind::TimedOut => {
+                if err.to_string() == "Read Timeout" {
+                    err
+                } else {
+                    io::Error::new(err.kind(), "Request Timeout".to_owned())
+                }
+            }
+            _ => err,
+        })?;
+    } else {
+        http_decoder.read_write().await?;
+    }
     Ok(())
 }
 
@@ -367,14 +378,24 @@ async fn from_https(
     debug!("Decoding response...");
     let mut http_decoder = HttpDecoder::new(out, &mut tls_client, read_timeout);
 
-    io::timeout(Duration::from_millis(request_timeout), async {
-        http_decoder.read_write().await
-    })
-    .await
-    .map_err(|err| match err.kind() {
-        io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Request Timeout".to_owned()),
-        _ => err,
-    })?;
+    if request_timeout > 0 {
+        io::timeout(Duration::from_millis(request_timeout), async {
+            http_decoder.read_write().await
+        })
+        .await
+        .map_err(|err| match err.kind() {
+            io::ErrorKind::TimedOut => {
+                if err.to_string() == "Read Timeout" {
+                    err
+                } else {
+                    io::Error::new(err.kind(), "Request Timeout".to_owned())
+                }
+            }
+            _ => err,
+        })?;
+    } else {
+        http_decoder.read_write().await?;
+    }
 
     Ok(())
 }
@@ -424,8 +445,28 @@ pub async fn http_query(
     })?;
 
     match request.scheme() {
-        "http" => from_http(request, &mut client, &mut out, verbose, read_timeout, request_timeout).await?,
-        "https" => from_https(request, &mut client, &mut out, verbose, read_timeout, request_timeout).await?,
+        "http" => {
+            from_http(
+                request,
+                &mut client,
+                &mut out,
+                verbose,
+                read_timeout,
+                request_timeout,
+            )
+            .await?
+        }
+        "https" => {
+            from_https(
+                request,
+                &mut client,
+                &mut out,
+                verbose,
+                read_timeout,
+                request_timeout,
+            )
+            .await?
+        }
         _ => {
             return Err(CabotError::SchemeError(format!(
                 "Unrecognized scheme {}",
