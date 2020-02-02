@@ -113,7 +113,7 @@ pub async fn run() -> CabotResult<()> {
             Arg::with_name("REQUEST_TIMEOUT")
                 .long("timeout")
                 .takes_value(true)
-                .default_value("30")
+                .default_value("0")
                 .help("timeout for the whole http request in seconds (0 means no timeout)"),
         )
         .arg(
