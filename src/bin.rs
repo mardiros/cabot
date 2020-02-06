@@ -327,9 +327,8 @@ impl<'a> Write for CabotBinWrite<'a> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
-        // let self_ = Pin::get_mut(self);
-        // self_.out.close();
-        Poll::Ready(Ok(()))
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        let self_ = Pin::get_mut(self);
+        Pin::new(&mut self_.out).poll_close(cx)
     }
 }
