@@ -214,10 +214,12 @@ impl<'a> HttpDecoder<'a> {
             "transfer_encoding_status: {:?}",
             self.transfer_encoding_status
         );
-        let mut can_process_buffer = self.buffer.len() > 0;
+        if self.buffer.len() == 0 {
+            return Ok(false);
+        }
         let mut body_chunk_size = 0;
         let mut header_len: usize;
-        while can_process_buffer {
+        loop {
             header_len = 0;
             if self.transfer_encoding_status == TransferEncodingStatus::ReadingHeader {
                 debug!("Reading header in Transfer-Encoding chunked");
@@ -274,6 +276,13 @@ impl<'a> HttpDecoder<'a> {
             }
 
             if let TransferEncodingStatus::ReadingBody(buf_size) = self.transfer_encoding_status {
+                if buf_size >= constants::BUFFER_PAGE_SIZE {
+                    let buf_size = buf_size - self.buffer.len();
+                    self.writer.write(self.buffer.as_slice()).await?;
+                    self.buffer.clear();
+                    self.transfer_encoding_status = TransferEncodingStatus::ReadingBody(buf_size);
+                    break;
+                }
                 if self.buffer.len() > (buf_size + 2) {
                     let mut buffer: Vec<u8> = self.buffer.drain(buf_size..).collect();
                     self.writer.write(self.buffer.as_slice()).await?;
@@ -281,13 +290,13 @@ impl<'a> HttpDecoder<'a> {
                     self.transfer_encoding_status = TransferEncodingStatus::ReadingHeader;
                     body_chunk_size = 0;
                     if self.buffer.len() < 4 {
-                        can_process_buffer = false;
+                        break;
                     }
                 } else {
-                    can_process_buffer = false;
+                    break;
                 }
             } else {
-                can_process_buffer = false;
+                break;
             }
         }
         return Ok(false);
