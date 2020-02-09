@@ -89,8 +89,8 @@ pub async fn run() -> CabotResult<()> {
                 .help("The user-agent HTTP header to use"),
         )
         .arg(
-            Arg::with_name("DNS_TIMEOUT")
-                .long("dns-lookup-timeout")
+            Arg::with_name("DNS_LOOKUP_TIMEOUT")
+                .long("dns-timeout")
                 .takes_value(true)
                 .default_value("5")
                 .help("timeout for the dns lookup resolution in seconds"),
@@ -201,8 +201,8 @@ pub async fn run() -> CabotResult<()> {
 
     let request = builder.build()?;
 
-    let dns_timeout = u64::from_str_radix(matches.value_of("DNS_TIMEOUT").unwrap(), 10)
-        .expect("DNS_TIMEOUT must be an integer")
+    let dns_timeout = u64::from_str_radix(matches.value_of("DNS_LOOKUP_TIMEOUT").unwrap(), 10)
+        .expect("DNS_LOOKUP_TIMEOUT must be an integer")
         * 1_000;
     let connect_timeout = u64::from_str_radix(matches.value_of("CONNECT_TIMEOUT").unwrap(), 10)
         .expect("CONNECT_TIMEOUT must be an integer")
