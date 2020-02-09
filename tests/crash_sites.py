@@ -6,8 +6,8 @@ import subprocess
 import sys
 
 in_path = __file__.replace('.py', '.txt')
-out_path = __file__.replace('.py', '.out')
-rej_path = __file__.replace('.py', '.reject')
+ko_path = __file__.replace('crash_sites.py', 'out/ko.txt')
+rej_path = __file__.replace('crash_sites.py', 'out/reject.txt')
 
 os.environ['RUST_BACKTRACE'] = '1'
 os.environ['RUSTLOG'] = 'cabot'
@@ -18,7 +18,7 @@ curl_rej_tmp = '/tmp/curl2.txt'
 
 
 def clean_up():
-    for file_ in (out_path, rej_path, cabot_tmp, curl_tmp, curl_rej_tmp):
+    for file_ in (ko_path, rej_path, cabot_tmp, curl_tmp, curl_rej_tmp):
         if os.path.exists(file_):
             os.unlink(file_)
 
@@ -65,7 +65,7 @@ def process_domain(domain, url, devnull):
             stderr=devnull,
         )
         eq = filecmp.cmp(curl_rej_tmp, curl_tmp)
-        outfile, msg = {True: (out_path, 'KO'), False: (rej_path, 'REJ')}[eq]
+        outfile, msg = {True: (ko_path, 'KO'), False: (rej_path, 'REJ')}[eq]
         with open(outfile, 'a') as outfd:
             outfd.write(domain + '\n')
         print(f'\n{msg}')
@@ -89,6 +89,7 @@ def process_domain(domain, url, devnull):
 
 def main():
     clean_up()
+    return
     with open(os.devnull) as devnull:
         for (domain, url) in get_websites():
             try:

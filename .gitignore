@@ -1,3 +1,4 @@
 target/
 .vscode/
 **/*.rs.bk
+tests/out/
