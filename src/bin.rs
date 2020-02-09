@@ -316,7 +316,19 @@ impl<'a> Write for CabotBinWrite<'a> {
             self_.header_read = true;
             Poll::Ready(Ok(0))
         } else {
-            Pin::new(&mut self_.out).poll_write(cx, buf)
+            let towrite = buf.len();
+            let mut written = 0;
+            loop {
+                let res = Pin::new(&mut self_.out).poll_write(cx, &buf[written..towrite]);
+                match res {
+                    Poll::Ready(Ok(l)) => written += l,
+                    _ => {}
+                }
+                if written >= towrite {
+                    break;
+                }
+            }
+            Poll::Ready(Ok(written))
         }
     }
 
