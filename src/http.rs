@@ -133,13 +133,14 @@ impl<'a> HttpDecoder<'a> {
 
     async fn read_write_chunk(&mut self) -> IoResult<()> {
         loop {
+            // we have data in the buffer while reading the headers
             let done = self.process_chunk().await?;
             if done {
                 break;
             }
             let cnt = self.chunk_read().await?;
             if cnt == 0 {
-                break;
+                debug!("No more chunk data to read");
             }
         }
 
