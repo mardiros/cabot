@@ -12,7 +12,7 @@ use log::Level::Info;
 use super::asynctls::TLSStream;
 use super::constants;
 use super::dns::Resolver;
-use super::request::Request;
+use super::request::{Request, RequestBuilder};
 use super::results::{CabotError, CabotResult};
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,39 @@ enum TransferEncodingStatus {
     ReadingHeader,
     ChunkHeader,
     ReadingBody(usize),
+}
+
+#[derive(Debug, PartialEq)]
+enum HTTPRedirect {
+    //HTTPMultipleChoices(String),
+    //HTTPNotModified(String),
+    //HTTPUseProxy(String),
+    HTTPFound(String),
+    HTTPMovedPermanently(String),
+    HTTPPermanentRedirect(String),
+    HTTPSeeOther(String),
+    HTTPTemporaryRedirect(String),
+}
+
+#[derive(Debug)]
+enum RedirectError {
+    CabotError(CabotError),
+    IOError(io::Error),
+    Redirect(HTTPRedirect),
+}
+
+type RedirectResult<T> = Result<T, RedirectError>;
+
+impl From<CabotError> for RedirectError {
+    fn from(err: CabotError) -> RedirectError {
+        RedirectError::CabotError(err)
+    }
+}
+
+impl From<io::Error> for RedirectError {
+    fn from(err: io::Error) -> RedirectError {
+        RedirectError::IOError(err)
+    }
 }
 
 fn drain_buffer<T>(buffer: &mut Vec<T>, size: usize) -> Vec<T> {
@@ -92,11 +125,12 @@ impl<'a> HttpDecoder<'a> {
             _ => err,
         })
     }
-    async fn read_write_headers(&mut self) -> IoResult<()> {
+    async fn read_headers(&mut self) -> RedirectResult<()> {
         info!("Reading headers");
         loop {
             let _count = self.chunk_read().await?;
-            if let Some(_) = self.process_headers().await {
+            let res = self.process_headers().await?;
+            if let Some(_) = res {
                 break;
             }
         }
@@ -170,20 +204,58 @@ impl<'a> HttpDecoder<'a> {
         Ok(())
     }
 
-    async fn read_write(&mut self) -> IoResult<()> {
-        self.read_write_headers().await?;
+    async fn stream_response(&mut self) -> IoResult<()> {
         self.read_write_body().await?;
         self.writer.flush().await
     }
 
-    async fn process_headers(&mut self) -> Option<usize> {
+    async fn process_headers(&mut self) -> RedirectResult<Option<usize>> {
         let ret = {
             let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
                 .splitn(self.buffer.as_slice(), 2)
                 .collect();
             if resp_header.len() == 2 {
-                // We have headers
-                let headers = resp_header.get(0).unwrap();
+                // We have the response headers
+
+                let http_ver_headers = resp_header.get(0).unwrap().clone();
+                let (_http_ver, headers) = http_ver_headers.split_at(9);
+                if headers.starts_with(b"3") || headers.starts_with(b"3") {
+                    let (code, _) = headers.split_at(3);
+                    if let Some(header) = constants::LOCATION.captures(headers) {
+                        if let Some(loc) = header.get(1) {
+                            let loc = String::from_utf8_lossy(loc.as_bytes()).into_owned();
+                            match code {
+                                b"301" => {
+                                    return Err(RedirectError::Redirect(
+                                        HTTPRedirect::HTTPMovedPermanently(loc),
+                                    ))
+                                }
+                                b"302" => {
+                                    return Err(RedirectError::Redirect(HTTPRedirect::HTTPFound(
+                                        loc,
+                                    )))
+                                }
+                                b"303" => {
+                                    return Err(RedirectError::Redirect(
+                                        HTTPRedirect::HTTPSeeOther(loc),
+                                    ))
+                                }
+                                b"307" => {
+                                    return Err(RedirectError::Redirect(
+                                        HTTPRedirect::HTTPTemporaryRedirect(loc),
+                                    ))
+                                }
+                                b"308" => {
+                                    return Err(RedirectError::Redirect(
+                                        HTTPRedirect::HTTPPermanentRedirect(loc),
+                                    ))
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                }
+
                 if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
                     if let Some(tenc) = header.get(1) {
                         self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
@@ -195,8 +267,8 @@ impl<'a> HttpDecoder<'a> {
                         self.transfer_encoding = TransferEncoding::ContentLength(clength);
                     }
                 }
-                let resp = headers.len();
-                self.writer.write(headers).await.unwrap();
+                let resp = http_ver_headers.len();
+                self.writer.write(http_ver_headers).await.unwrap();
                 Some(resp + 4) // + CRLF CRLF
             } else {
                 None
@@ -204,11 +276,11 @@ impl<'a> HttpDecoder<'a> {
         };
         if let Some(to_drain) = ret {
             self.buffer = drain_buffer(&mut self.buffer, to_drain);
-            info!("End of Headers readched");
+            info!("End of Headers reached");
             debug!("Transfer encoding: {:?}", self.transfer_encoding);
             debug!("{:?}", String::from_utf8_lossy(self.buffer.as_slice()));
         }
-        ret
+        Ok(ret)
     }
     async fn process_chunk(&mut self) -> IoResult<bool> {
         debug!(
@@ -345,7 +417,7 @@ async fn from_http(
     verbose: bool,
     read_timeout: u64,
     request_timeout: u64,
-) -> CabotResult<()> {
+) -> RedirectResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
     log_request(&raw_request, verbose).await;
@@ -357,9 +429,11 @@ async fn from_http(
 
     let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
 
+    http_decoder.read_headers().await?;
+
     if request_timeout > 0 {
         io::timeout(Duration::from_millis(request_timeout), async {
-            http_decoder.read_write().await
+            http_decoder.stream_response().await
         })
         .await
         .map_err(|err| match err.kind() {
@@ -373,7 +447,7 @@ async fn from_http(
             _ => err,
         })?;
     } else {
-        http_decoder.read_write().await?;
+        http_decoder.stream_response().await?;
     }
     Ok(())
 }
@@ -385,7 +459,7 @@ async fn from_https(
     verbose: bool,
     read_timeout: u64,
     request_timeout: u64,
-) -> CabotResult<()> {
+) -> RedirectResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
     log_request(&raw_request, verbose).await;
@@ -400,9 +474,11 @@ async fn from_https(
     debug!("Decoding response...");
     let mut http_decoder = HttpDecoder::new(out, &mut tls_client, read_timeout);
 
+    http_decoder.read_headers().await?;
+
     if request_timeout > 0 {
         io::timeout(Duration::from_millis(request_timeout), async {
-            http_decoder.read_write().await
+            http_decoder.stream_response().await
         })
         .await
         .map_err(|err| match err.kind() {
@@ -416,7 +492,7 @@ async fn from_https(
             _ => err,
         })?;
     } else {
-        http_decoder.read_write().await?;
+        http_decoder.stream_response().await?;
     }
 
     Ok(())
@@ -433,71 +509,106 @@ pub async fn http_query(
     connect_timeout: u64,
     read_timeout: u64,
     request_timeout: u64,
+    max_redir: u8,
 ) -> CabotResult<()> {
     debug!(
         "HTTP Query {} {}",
         request.http_method(),
         request.request_uri()
     );
+    let mut redir_req: Option<Request> = None;
+    debug!("{:?}", redir_req.is_none()); // avoid warning
+    let mut request = request;
+    let mut max_redir = max_redir;
+    loop {
+        let authority = request.authority();
+        let addr = match authorities.get(authority) {
+            Some(val) => {
+                info!("Fetch authority {} using autorities map", authority);
+                *val
+            }
+            None => {
+                info!("Fetch authority {} using resolver", authority);
+                let resolver = Resolver::new(verbose);
+                resolver
+                    .get_addr(authority, ipv4, ipv6, dns_timeout)
+                    .await?
+            }
+        };
 
-    let authority = request.authority();
+        info!("Connecting to {}", addr);
+        let mut client = io::timeout(Duration::from_millis(connect_timeout), async {
+            TcpStream::connect(addr).await
+        })
+        .await
+        .map_err(|err| match err.kind() {
+            io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Connection Timeout".to_owned()),
+            _ => err,
+        })?;
 
-    let addr = match authorities.get(authority) {
-        Some(val) => {
-            info!("Fetch authority {} using autorities map", authority);
-            *val
+        let resp = match request.scheme() {
+            "http" => {
+                from_http(
+                    request,
+                    &mut client,
+                    &mut out,
+                    verbose,
+                    read_timeout,
+                    request_timeout,
+                )
+                .await
+            }
+            "https" => {
+                from_https(
+                    request,
+                    &mut client,
+                    &mut out,
+                    verbose,
+                    read_timeout,
+                    request_timeout,
+                )
+                .await
+            }
+            _ => {
+                return Err(CabotError::SchemeError(format!(
+                    "Unrecognized scheme {}",
+                    request.scheme()
+                )))
+            }
+        };
+        if let Err(RedirectError::Redirect(redir)) = resp {
+            if max_redir <= 0 {
+                break;
+            }
+            let mut redir_req_builder = match redir {
+                HTTPRedirect::HTTPMovedPermanently(url)
+                | HTTPRedirect::HTTPFound(url)
+                | HTTPRedirect::HTTPSeeOther(url) => RequestBuilder::new(url.as_str()),
+                HTTPRedirect::HTTPPermanentRedirect(url)
+                | HTTPRedirect::HTTPTemporaryRedirect(url) => {
+                    let mut req =
+                        RequestBuilder::new(url.as_str()).set_http_method(request.http_method());
+                    if let Some(body) = request.body() {
+                        req = req.set_body(body);
+                    }
+                    req
+                }
+            };
+            for header in request.headers() {
+                if header.to_ascii_uppercase().starts_with("USER-AGENT:") {
+                    let (_, ua) = header.split_at(11);
+                    redir_req_builder = redir_req_builder.set_user_agent(ua.trim());
+                } else if header.to_ascii_uppercase().starts_with("SET-COOKIE:") {
+                    redir_req_builder = redir_req_builder.add_header(header);
+                }
+            }
+            redir_req = Some(redir_req_builder.build()?);
+            request = redir_req.as_ref().unwrap();
+            max_redir = max_redir - 1;
+        } else {
+            break;
         }
-        None => {
-            info!("Fetch authority {} using resolver", authority);
-            let resolver = Resolver::new(verbose);
-            resolver
-                .get_addr(authority, ipv4, ipv6, dns_timeout)
-                .await?
-        }
-    };
-
-    info!("Connecting to {}", addr);
-    let mut client = io::timeout(Duration::from_millis(connect_timeout), async {
-        TcpStream::connect(addr).await
-    })
-    .await
-    .map_err(|err| match err.kind() {
-        io::ErrorKind::TimedOut => io::Error::new(err.kind(), "Connection Timeout".to_owned()),
-        _ => err,
-    })?;
-
-    match request.scheme() {
-        "http" => {
-            from_http(
-                request,
-                &mut client,
-                &mut out,
-                verbose,
-                read_timeout,
-                request_timeout,
-            )
-            .await?
-        }
-        "https" => {
-            from_https(
-                request,
-                &mut client,
-                &mut out,
-                verbose,
-                read_timeout,
-                request_timeout,
-            )
-            .await?
-        }
-        _ => {
-            return Err(CabotError::SchemeError(format!(
-                "Unrecognized scheme {}",
-                request.scheme()
-            )))
-        }
-    };
-
+    }
     out.flush().await.unwrap();
-
     Ok(())
 }

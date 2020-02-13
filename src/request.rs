@@ -127,6 +127,11 @@ impl Request {
         self.scheme.as_str()
     }
 
+    /// The http query headers.
+    pub fn headers(&self) -> &[String] {
+        self.headers.as_slice()
+    }
+
     /// The URI to send, something like a PATH_INFO and a querystring.
     pub fn request_uri(&self) -> &str {
         self.request_uri.as_str()

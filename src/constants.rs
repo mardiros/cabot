@@ -7,6 +7,7 @@ use regex::Regex;
 
 /// Version of cabot
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const NUMBER_OF_REDIRECT: u8 = 16;
 
 pub fn user_agent() -> String {
     format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
@@ -30,4 +31,8 @@ lazy_static! {
             .case_insensitive(true)
             .build()
             .expect("Invalid CONTENT_LENGTH Regex");
+    pub static ref LOCATION: BytesRegex = BytesRegexBuilder::new(r"\nLocation:\s*(\S*)")
+        .case_insensitive(true)
+        .build()
+        .expect("Invalid LOCATION Regex");
 }
