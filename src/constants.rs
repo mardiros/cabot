@@ -9,6 +9,11 @@ use regex::Regex;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NUMBER_OF_REDIRECT: u8 = 16;
 
+pub const DNS_LOOKUP_TIMEOUT: u64 = 5;
+pub const CONNECT_TIMEOUT: u64 = 15;
+pub const READ_TIMEOUT: u64 = 10;
+pub const REQUEST_TIMEOUT: u64 = 0;
+
 pub fn user_agent() -> String {
     format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }

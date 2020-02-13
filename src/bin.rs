@@ -24,7 +24,14 @@ use cabot::results::CabotResult;
 
 pub async fn run() -> CabotResult<()> {
     let user_agent: String = constants::user_agent();
+
+    let dns_lookup_timeout = format!("{}", constants::DNS_LOOKUP_TIMEOUT);
+    let connect_timeout = format!("{}", constants::CONNECT_TIMEOUT);
+    let request_timeout = format!("{}", constants::REQUEST_TIMEOUT);
+    let read_timeout = format!("{}", constants::READ_TIMEOUT);
+
     let number_of_redirect = format!("{}", constants::NUMBER_OF_REDIRECT);
+
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -93,28 +100,28 @@ pub async fn run() -> CabotResult<()> {
             Arg::with_name("DNS_LOOKUP_TIMEOUT")
                 .long("dns-timeout")
                 .takes_value(true)
-                .default_value("5")
+                .default_value(dns_lookup_timeout.as_str())
                 .help("timeout for the dns lookup resolution in seconds"),
         )
         .arg(
             Arg::with_name("CONNECT_TIMEOUT")
                 .long("connect-timeout")
                 .takes_value(true)
-                .default_value("15")
+                .default_value(connect_timeout.as_str())
                 .help("timeout for the tcp connection"),
         )
         .arg(
             Arg::with_name("READ_TIMEOUT")
                 .long("read-timeout")
                 .takes_value(true)
-                .default_value("10")
+                .default_value(read_timeout.as_str())
                 .help("timeout for the tcp read in seconds"),
         )
         .arg(
             Arg::with_name("REQUEST_TIMEOUT")
                 .long("max-time")
                 .takes_value(true)
-                .default_value("0")
+                .default_value(request_timeout.as_str())
                 .help("timeout for the whole http request in seconds (0 means no timeout)"),
         )
         .arg(
