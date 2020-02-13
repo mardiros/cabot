@@ -24,6 +24,7 @@ use cabot::results::CabotResult;
 
 pub async fn run() -> CabotResult<()> {
     let user_agent: String = constants::user_agent();
+    let number_of_redirect = format!("{}", constants::NUMBER_OF_REDIRECT);
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -117,6 +118,13 @@ pub async fn run() -> CabotResult<()> {
                 .help("timeout for the whole http request in seconds (0 means no timeout)"),
         )
         .arg(
+            Arg::with_name("NUMBER_OF_REDIRECT")
+                .long("max-redirs")
+                .takes_value(true)
+                .default_value(number_of_redirect.as_str())
+                .help("max number of redirection before returning a response"),
+        )
+        .arg(
             Arg::with_name("RESOLVE")
                 .long("resolve")
                 .takes_value(true)
@@ -202,6 +210,9 @@ pub async fn run() -> CabotResult<()> {
     let request_timeout = u64::from_str_radix(matches.value_of("REQUEST_TIMEOUT").unwrap(), 10)
         .expect("REQUEST_TIMEOUT must be an integer")
         * 1_000;
+    let number_of_redirect =
+        u8::from_str_radix(matches.value_of("NUMBER_OF_REDIRECT").unwrap(), 10)
+            .expect("NUMBER_OF_REDIRECT must be an integer");
 
     let mut builder = RequestBuilder::new(url)
         .set_http_method(http_method)
@@ -233,7 +244,7 @@ pub async fn run() -> CabotResult<()> {
             connect_timeout,
             read_timeout,
             request_timeout,
-            constants::NUMBER_OF_REDIRECT,
+            number_of_redirect,
         )
         .await?
     } else {
@@ -248,7 +259,7 @@ pub async fn run() -> CabotResult<()> {
             connect_timeout,
             read_timeout,
             request_timeout,
-            constants::NUMBER_OF_REDIRECT,
+            number_of_redirect,
         )
         .await?
     };
