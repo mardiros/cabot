@@ -17,6 +17,7 @@ def run_command(context):
 
 
 def before_all(context):
+
     test_dir = pathlib.Path(__file__).resolve().parent.parent
     test_dir.joinpath('cabot').unlink(missing_ok=True)
     working_dir = test_dir.parent.parent
@@ -27,7 +28,7 @@ def before_all(context):
         test_dir,
     )
     os.chdir(test_dir)
-    os.environ['PATH'] = os.environ['PATH'] + ':.'
+    os.environ['PATH'] += os.pathsep + str(test_dir)
 
 
 def before_scenario(context, scenario):

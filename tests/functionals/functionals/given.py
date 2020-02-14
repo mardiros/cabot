@@ -1,5 +1,6 @@
-from behave import given
+"""Generic given statements."""
 
+from behave import given
 
 @given('cabot')
 def get_cabot(context):

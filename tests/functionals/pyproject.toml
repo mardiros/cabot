@@ -6,10 +6,8 @@ authors = ["Guillaume Gauvrit <guillaume@gauvr.it>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-behave = "^1.2.6"
-
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
+behave-pytest = "^0.1.1"
+pytest = "^2.0"  # behave-pytest requirements without freeze
 
 [build-system]
 requires = ["poetry>=0.12"]
