@@ -516,8 +516,7 @@ pub async fn http_query(
         request.http_method(),
         request.request_uri()
     );
-    let mut redir_req: Option<Request> = None;
-    debug!("{:?}", redir_req.is_none()); // avoid warning
+    let mut redir_req: Option<Request>;
     let mut request = request;
     let mut max_redir = max_redir;
     loop {
