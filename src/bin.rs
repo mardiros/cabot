@@ -22,9 +22,23 @@ use cabot::http;
 use cabot::request::RequestBuilder;
 use cabot::results::CabotResult;
 
+macro_rules! parse_int {
+    ($name:expr, $typ:ty, $matches:ident) => {
+        <$typ>::from_str_radix($matches.value_of($name).unwrap(), 10)
+            .expect(format!("{} must be an integer", $name).as_str())
+    };
+}
+
 pub async fn run() -> CabotResult<()> {
     let user_agent: String = constants::user_agent();
+
+    let dns_lookup_timeout = format!("{}", constants::DNS_LOOKUP_TIMEOUT);
+    let connect_timeout = format!("{}", constants::CONNECT_TIMEOUT);
+    let request_timeout = format!("{}", constants::REQUEST_TIMEOUT);
+    let read_timeout = format!("{}", constants::READ_TIMEOUT);
+
     let number_of_redirect = format!("{}", constants::NUMBER_OF_REDIRECT);
+
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(constants::VERSION)
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -93,28 +107,28 @@ pub async fn run() -> CabotResult<()> {
             Arg::with_name("DNS_LOOKUP_TIMEOUT")
                 .long("dns-timeout")
                 .takes_value(true)
-                .default_value("5")
+                .default_value(dns_lookup_timeout.as_str())
                 .help("timeout for the dns lookup resolution in seconds"),
         )
         .arg(
             Arg::with_name("CONNECT_TIMEOUT")
                 .long("connect-timeout")
                 .takes_value(true)
-                .default_value("15")
+                .default_value(connect_timeout.as_str())
                 .help("timeout for the tcp connection"),
         )
         .arg(
             Arg::with_name("READ_TIMEOUT")
                 .long("read-timeout")
                 .takes_value(true)
-                .default_value("10")
+                .default_value(read_timeout.as_str())
                 .help("timeout for the tcp read in seconds"),
         )
         .arg(
             Arg::with_name("REQUEST_TIMEOUT")
-                .long("timeout")
+                .long("max-time")
                 .takes_value(true)
-                .default_value("0")
+                .default_value(request_timeout.as_str())
                 .help("timeout for the whole http request in seconds (0 means no timeout)"),
         )
         .arg(
@@ -198,21 +212,11 @@ pub async fn run() -> CabotResult<()> {
         None => HashMap::new(),
     };
 
-    let dns_timeout = u64::from_str_radix(matches.value_of("DNS_LOOKUP_TIMEOUT").unwrap(), 10)
-        .expect("DNS_LOOKUP_TIMEOUT must be an integer")
-        * 1_000;
-    let connect_timeout = u64::from_str_radix(matches.value_of("CONNECT_TIMEOUT").unwrap(), 10)
-        .expect("CONNECT_TIMEOUT must be an integer")
-        * 1_000;
-    let read_timeout = u64::from_str_radix(matches.value_of("READ_TIMEOUT").unwrap(), 10)
-        .expect("READ_TIMEOUT must be an integer")
-        * 1_000;
-    let request_timeout = u64::from_str_radix(matches.value_of("REQUEST_TIMEOUT").unwrap(), 10)
-        .expect("REQUEST_TIMEOUT must be an integer")
-        * 1_000;
-    let number_of_redirect =
-        u8::from_str_radix(matches.value_of("NUMBER_OF_REDIRECT").unwrap(), 10)
-            .expect("NUMBER_OF_REDIRECT must be an integer");
+    let dns_timeout = parse_int!("DNS_LOOKUP_TIMEOUT", u64, matches) * 1_000;
+    let connect_timeout = parse_int!("CONNECT_TIMEOUT", u64, matches) * 1_000;
+    let read_timeout = parse_int!("READ_TIMEOUT", u64, matches) * 1_000;
+    let request_timeout = parse_int!("REQUEST_TIMEOUT", u64, matches) * 1_000;
+    let number_of_redirect = parse_int!("NUMBER_OF_REDIRECT", u8, matches);
 
     let mut builder = RequestBuilder::new(url)
         .set_http_method(http_method)

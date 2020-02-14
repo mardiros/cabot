@@ -36,10 +36,10 @@ impl Client {
             ipv4: true,
             ipv6: true,
             authorities: HashMap::new(),
-            dns_timeout: 5_000,
-            connect_timeout: 15_000,
-            read_timeout: 10_000,
-            request_timeout: 30_000,
+            dns_timeout: constants::DNS_LOOKUP_TIMEOUT * 1000,
+            connect_timeout: constants::CONNECT_TIMEOUT * 1000,
+            read_timeout: constants::READ_TIMEOUT * 1000,
+            request_timeout: constants::REQUEST_TIMEOUT * 1000,
             max_redir: constants::NUMBER_OF_REDIRECT,
         }
     }
