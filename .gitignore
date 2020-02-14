@@ -4,3 +4,4 @@ target/
 tests/out/
 __pycache__
 *.pyc
+tests/functionals/cabot
