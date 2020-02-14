@@ -15,14 +15,20 @@ use super::dns::Resolver;
 use super::request::{Request, RequestBuilder};
 use super::results::{CabotError, CabotResult};
 
+/// How do we have to decode the http response.
 #[derive(Debug, PartialEq)]
 enum TransferEncoding {
+    /// A content-lenght has been found in the header, we now how many bytes to read.
     ContentLength(usize),
+    /// A header transfer-encoding chunked has been found, we will parce content length by chunk.
     Chunked,
+    /// A header transfer-encoding header has been found but we don't provide an implementation for it.
     Unkown,
+    /// The transfer encoding is not initialized yet.
     None,
 }
 
+/// Internal status used while decoding a chunked http resonse.
 #[derive(Debug, PartialEq)]
 enum TransferEncodingStatus {
     ReadingHeader,
@@ -30,18 +36,26 @@ enum TransferEncodingStatus {
     ReadingBody(usize),
 }
 
+/// 3xx implemented representations for redirection.
 #[derive(Debug, PartialEq)]
 enum HTTPRedirect {
+    // unimplemented.
     //HTTPMultipleChoices(String),
     //HTTPNotModified(String),
     //HTTPUseProxy(String),
+    /// 302 Found (temporary redirect)
     HTTPFound(String),
+    /// 301 Moved Permanently
     HTTPMovedPermanently(String),
+    /// 308 Permanent Redirect (like 301 but preserve the http method)
     HTTPPermanentRedirect(String),
+    /// 303 See others
     HTTPSeeOther(String),
+    /// 307 Temporary Redirect (like 307 but temporary)
     HTTPTemporaryRedirect(String),
 }
 
+/// Wraps errors to handle http redirections.
 #[derive(Debug)]
 enum RedirectError {
     CabotError(CabotError),
@@ -49,6 +63,7 @@ enum RedirectError {
     Redirect(HTTPRedirect),
 }
 
+/// Http redirections handler.
 type RedirectResult<T> = Result<T, RedirectError>;
 
 impl From<CabotError> for RedirectError {
@@ -63,6 +78,7 @@ impl From<io::Error> for RedirectError {
     }
 }
 
+/// drain the buffer safely, do not panic if the size is greater than the buffer.
 fn drain_buffer<T>(buffer: &mut Vec<T>, size: usize) -> Vec<T> {
     if buffer.len() >= size {
         buffer.drain(size..).collect()
@@ -84,16 +100,26 @@ impl From<&[u8]> for TransferEncoding {
     }
 }
 
+/// HTTP Response decoder.
 struct HttpDecoder<'a> {
+    //// read the http response stream/
     reader: &'a mut (dyn Read + Unpin), // tls require Write
+    /// write the decoded http response.
+    /// note that the first write called contains the header
+    /// then write response by chunked.
     writer: &'a mut (dyn Write + Unpin),
+    /// internal buffer to decode the response.
     buffer: Vec<u8>,
+    /// response decoding strategy
     transfer_encoding: TransferEncoding,
+    /// internal state when decoding the response
     transfer_encoding_status: TransferEncodingStatus,
+    /// max time to wait while reading chunks.
     read_timeout: Duration,
 }
 
 impl<'a> HttpDecoder<'a> {
+    /// Create the new http decoder.
     fn new(
         writer: &'a mut (dyn Write + Unpin),
         reader: &'a mut (dyn Read + Unpin),
@@ -109,6 +135,7 @@ impl<'a> HttpDecoder<'a> {
         }
     }
 
+    /// Read a chunk from the reader to the buffer.
     async fn chunk_read(&mut self) -> IoResult<usize> {
         let ret = io::timeout(self.read_timeout, async {
             let mut buf = [0; constants::BUFFER_PAGE_SIZE];
@@ -125,6 +152,8 @@ impl<'a> HttpDecoder<'a> {
             _ => err,
         })
     }
+
+    /// read http headers
     async fn read_headers(&mut self) -> RedirectResult<()> {
         info!("Reading headers");
         loop {
@@ -137,6 +166,7 @@ impl<'a> HttpDecoder<'a> {
         Ok(())
     }
 
+    /// read the body, write to the given writer with when no strategy found
     async fn read_write_no_transfer_encoding(&mut self) -> IoResult<()> {
         loop {
             self.writer.write(self.buffer.as_slice()).await.unwrap();
@@ -146,10 +176,11 @@ impl<'a> HttpDecoder<'a> {
                 break;
             }
         }
-
         Ok(())
     }
 
+    /// read the body, write to the given writer with when the strategy
+    /// is based on the http header Content-Length.
     async fn read_content_length(&mut self, size: usize) -> IoResult<()> {
         let mut read_count = self.buffer.len();
         loop {
@@ -165,6 +196,8 @@ impl<'a> HttpDecoder<'a> {
         Ok(())
     }
 
+    /// read the body, write to the given writer with when the strategy
+    /// is based on the http header Transfer-Encoding: chunked.
     async fn read_write_chunk(&mut self) -> IoResult<()> {
         loop {
             // we have data in the buffer while reading the headers
@@ -177,11 +210,11 @@ impl<'a> HttpDecoder<'a> {
                 debug!("No more chunk data to read");
             }
         }
-
         Ok(())
     }
 
-    async fn read_write_body(&mut self) -> IoResult<()> {
+    /// read the body, write to the given writer
+    async fn stream_response(&mut self) -> IoResult<()> {
         info!("Reading body");
         match self.transfer_encoding {
             TransferEncoding::ContentLength(size) => {
@@ -201,14 +234,11 @@ impl<'a> HttpDecoder<'a> {
             error!("Buffer not clear: {}", b);
         }
 
-        Ok(())
-    }
-
-    async fn stream_response(&mut self) -> IoResult<()> {
-        self.read_write_body().await?;
         self.writer.flush().await
     }
 
+    /// Process headers to define the  body decoding strategy and
+    /// to follow redirections.
     async fn process_headers(&mut self) -> RedirectResult<Option<usize>> {
         let ret = {
             let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
@@ -282,6 +312,8 @@ impl<'a> HttpDecoder<'a> {
         }
         Ok(ret)
     }
+
+    /// Process the data in the buffer.
     async fn process_chunk(&mut self) -> IoResult<bool> {
         debug!(
             "transfer_encoding_status: {:?}",
@@ -376,6 +408,7 @@ impl<'a> HttpDecoder<'a> {
     }
 }
 
+/// log the request.
 async fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
         return;
@@ -410,6 +443,7 @@ async fn log_request(request: &[u8], verbose: bool) {
     }
 }
 
+/// Read plain text http request (no encryption)
 async fn from_http(
     request: &Request,
     client: &mut TcpStream,
@@ -452,6 +486,7 @@ async fn from_http(
     Ok(())
 }
 
+/// Read TLS http request
 async fn from_https(
     request: &Request,
     client: &mut TcpStream,
@@ -498,6 +533,7 @@ async fn from_https(
     Ok(())
 }
 
+/// Process the given http query, write response to the `out` writer.
 pub async fn http_query(
     request: &Request,
     mut out: &mut (dyn Write + Unpin),
