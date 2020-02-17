@@ -25,6 +25,7 @@ doc = false
 [features]
 default = []
 pretty_log = ["pretty_env_logger"]
+functional_tests = []
 
 [dependencies]
 
