@@ -1,6 +1,7 @@
 
 Feature: As a user, I can read the help message
 
+@help
 Scenario: read command line output without parameter
 Given cabot
 When I run "cabot"
@@ -17,6 +18,7 @@ And stderr display
 
     """
 
+@help
 Scenario: read command line output from --help
 Given cabot
 When I run "cabot --help"
