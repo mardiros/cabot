@@ -49,7 +49,7 @@ And stdout display
             --read-timeout <READ_TIMEOUT>          timeout for the tcp read in seconds [default: 10]
         -X, --request <REQUEST>                    Specify request command to use [default: GET]
             --max-time <REQUEST_TIMEOUT>           timeout for the whole http request in seconds (0 means no timeout)
-                                                    [default: 0]
+                                                   [default: 0]
             --resolve <RESOLVE>...                 <host:port:address> Resolve the host+port to this address
         -A, --user-agent <UA>                      The user-agent HTTP header to use [default: cabot/0.4.0]
 

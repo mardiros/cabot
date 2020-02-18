@@ -12,7 +12,7 @@ def check_stderr(context):
     for x, y in zip(
         context.stash['result'].stderr.split('\n'), context.text.split('\n')
     ):
-        assert x.strip() == y.strip()
+        assert x == y
 
 
 @then('stderr is empty')
@@ -25,4 +25,18 @@ def check_stdout(context):
     for x, y in zip(
         context.stash['result'].stdout.split('\n'), context.text.split('\n')
     ):
-        assert x.strip() == y.strip()
+        assert x == y
+
+
+@then('stdout is empty')
+def check_empty_stderr(context):
+    assert context.stash['result'].stdout == ''
+
+
+@then('tmpfile contains')
+def check_stdout(context):
+    with open('outfile.tmp', 'r') as f:
+        for x, y in zip(
+            f.readlines(), context.text.split('\n')
+        ):
+            assert x.rstrip('\n') == y

@@ -34,6 +34,7 @@ def before_all(context):
     wsgi.setUp()
 
 
+
 def before_scenario(context, scenario):
     context.stash = {}
     context.run = run_command(context)
@@ -41,3 +42,4 @@ def before_scenario(context, scenario):
 
 def after_all(context):
     wsgi.tearDown()
+    pathlib.Path('outfile.tmp').unlink(missing_ok=True)

@@ -135,9 +135,26 @@ class WsgiApp:
         ]
         return status, headers, body
 
-    def E500(self):
-        status = '500 Internal Server Error'
-        body = b"""It is not working."""
+    def lorem_ipsum(self):
+        status = '200 Ok'
+        body = b"""Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Nullam interdum, diam in luctus hendrerit, metus arcu rutrum neque, et
+fringilla arcu purus non mi. Donec condimentum auctor maximus.
+Vivamus pellentesque ullamcorper risus. Vivamus a nibh ante.
+Proin eu urna arcu. Nunc et porta felis, ut viverra nisi.
+Vestibulum vestibulum, felis id euismod gravida, nulla quam luctus nunc,
+sit amet porttitor tellus purus vitae dui. Integer porta tincidunt massa
+eget condimentum.
+Donec gravida massa at ex semper, nec mattis purus rhoncus.
+Mauris dignissim, diam at dignissim vulputate, tortor dolor accumsan metus,
+vitae efficitur dui lacus ut nunc.
+Maecenas lectus nibh, accumsan vitae lorem non, congue lacinia justo.
+Cras auctor sollicitudin varius. Vivamus malesuada lobortis dolor id
+sollicitudin.
+In orci justo, sollicitudin non imperdiet blandit, semper vel sem.
+Nunc et augue sed nulla ultricies molestie quis gravida mi.
+Praesent eget euismod est, quis auctor erat.
+"""
         headers = [
             ('Date', 'Mon, 17 Feb 2020 21:11:21 GMT'),
             ('Content-type', 'text/plain; charset=utf-8'),
