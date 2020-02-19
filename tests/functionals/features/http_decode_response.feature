@@ -28,7 +28,7 @@ And stderr display
     > User-Agent: cabot/0.4.0
     > Connection: close
     >
-    < HTTP/1.0 200 OK
+    < HTTP/1.1 200 OK
     < Server: Dummy-Server
     < Date: Mon, 17 Feb 2020 21:11:21 GMT
     < Content-type: text/plain; charset=utf-8
@@ -61,7 +61,7 @@ And stderr display
     > User-Agent: cabot/0.4.0
     > Connection: close
     >
-    < HTTP/1.0 200 OK
+    < HTTP/1.1 200 OK
     < Server: Dummy-Server
     < Date: Mon, 17 Feb 2020 21:11:21 GMT
     < Content-type: text/plain; charset=utf-8
@@ -85,7 +85,7 @@ And stderr display
     > User-Agent: cabot/0.4.0
     > Connection: close
     >
-    < HTTP/1.0 200 OK
+    < HTTP/1.1 200 OK
     < Server: Dummy-Server
     < Date: Mon, 17 Feb 2020 21:11:21 GMT
     < Content-type: text/plain; charset=utf-8

@@ -25,7 +25,7 @@ def before_all(context):
     os.chdir(working_dir)
     subprocess.run(['cargo', 'build', '--features', 'functional_tests'])
     copy2(
-        working_dir.joinpath('target', 'release', 'cabot'),
+        working_dir.joinpath('target', 'debug', 'cabot'),
         test_dir,
     )
     os.chdir(test_dir)

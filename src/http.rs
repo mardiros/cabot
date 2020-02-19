@@ -7,7 +7,7 @@ use std::vec::Vec;
 use async_std::io::{self, stderr, Read, Result as IoResult, Write};
 use async_std::net::{SocketAddr, TcpStream};
 use async_std::prelude::*;
-use log::Level::Info;
+use log::Level::{Info, Warn};
 
 use super::asynctls::TLSStream;
 use super::constants;
@@ -554,7 +554,7 @@ pub async fn http_query(
     );
     let mut redir_req: Option<Request>;
     let mut request = request;
-    let mut max_redir = max_redir;
+    let mut followed_redir = max_redir;
     loop {
         let authority = request.authority();
         let addr = match authorities.get(authority) {
@@ -612,8 +612,19 @@ pub async fn http_query(
             }
         };
         if let Err(RedirectError::Redirect(redir)) = resp {
-            if max_redir <= 0 {
-                break;
+            if followed_redir <= 0 {
+                if log_enabled!(Warn) {
+                    warn!("Maximum redirects followed ({})", max_redir);
+                } else if verbose {
+                    writeln!(
+                        &mut stderr(),
+                        "* Maximum redirects followed ({})",
+                        max_redir
+                    )
+                    .await
+                    .unwrap();
+                }
+                return Err(CabotError::MaxRedirectionAttempt(max_redir));
             }
             let mut redir_req_builder = match redir {
                 HTTPRedirect::HTTPMovedPermanently(url)
@@ -639,7 +650,7 @@ pub async fn http_query(
             }
             redir_req = Some(redir_req_builder.build()?);
             request = redir_req.as_ref().unwrap();
-            max_redir = max_redir - 1;
+            followed_redir = followed_redir - 1;
         } else {
             break;
         }

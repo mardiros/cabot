@@ -12,6 +12,7 @@ from wsgiref.simple_server import (
 
 class MyServerHandler(ServerHandler):
     server_software = 'Dummy-Server'
+    http_version = '1.1'
 
     def set_content_length(self):
         pass
@@ -159,6 +160,24 @@ Praesent eget euismod est, quis auctor erat.
             ('Date', 'Mon, 17 Feb 2020 21:11:21 GMT'),
             ('Content-type', 'text/plain; charset=utf-8'),
             ('Content-Length', str(len(body))),
+        ]
+        return status, headers, body
+
+    def redirect_count_down(self):
+        count = int(self.environ['QUERY_STRING'])
+
+        status = '302 Found'
+        location = (
+            'http://127.0.0.1:8000/redirect-count-down?{}'.format(count - 1)
+            if count
+            else 'http://127.0.0.1:8000/with-length'
+        )
+        body = "Go see {}".format(location).encode('utf-8')
+        headers = [
+            ('Date', 'Mon, 17 Feb 2020 21:11:21 GMT'),
+            ('Content-type', 'text/plain; charset=utf-8'),
+            ('Content-Length', str(len(body))),
+            ('Location', location,),
         ]
         return status, headers, body
 
