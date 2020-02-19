@@ -50,7 +50,9 @@ impl Resolver {
                 "* Authority {} has been resolved to {}",
                 authority,
                 addr
-            ).await.unwrap();
+            )
+            .await
+            .unwrap();
         }
         Ok(addr)
     }
