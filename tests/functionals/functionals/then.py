@@ -22,6 +22,10 @@ def check_empty_stderr(context):
 
 @then('stdout display')
 def check_stdout(context):
+    print('#' *80)
+    print(context.stash['result'])
+    print('#' *80)
+
     for x, y in zip(
         context.stash['result'].stdout.split('\n'), context.text.split('\n')
     ):

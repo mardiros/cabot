@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 import subprocess
 import time
+from io import StringIO
+from pprint import pprint
 
 from wsgiref.util import setup_testing_defaults
 from wsgiref.simple_server import (
@@ -178,6 +180,34 @@ Praesent eget euismod est, quis auctor erat.
             ('Content-type', 'text/plain; charset=utf-8'),
             ('Content-Length', str(len(body))),
             ('Location', location,),
+        ]
+        return status, headers, body
+
+    def echo(self):
+        status = '200 OK'
+        stream = StringIO()
+        env = {
+            key: val
+            for key, val in self.environ.items()
+            if key.startswith('HTTP')
+            or key.startswith('CONTENT')
+            or key in ('REQUEST_METHOD', 'PATH_INFO', 'QUERY_STRING')
+        }
+        pprint(self.environ)
+        if env.get('CONTENT_LENGTH'):
+            env['body'] = (
+                self.environ['wsgi.input']
+                .read(int(env['CONTENT_LENGTH']))
+                .decode('utf-8')
+            )
+        body = sorted(
+            '{}: {}'.format(key, val) for key, val in env.items() if val
+        )
+        body = '\n'.join(body).encode('utf-8') + b'\n'
+        headers = [
+            ('Date', 'Mon, 17 Feb 2020 21:11:21 GMT'),
+            ('Content-type', 'text/plain; charset=utf-8'),
+            ('Content-Length', str(len(body))),
         ]
         return status, headers, body
 

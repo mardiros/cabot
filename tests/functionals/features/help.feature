@@ -1,4 +1,3 @@
-
 Feature: As a user, I can read the help message
 
 @help

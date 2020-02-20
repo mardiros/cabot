@@ -1,4 +1,3 @@
-
 Feature: As a user, I can get http response body after many redirection
 
 @http

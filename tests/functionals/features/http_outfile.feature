@@ -1,4 +1,3 @@
-
 Feature: As a user, I can store the http content to a specified file.
 
 @http

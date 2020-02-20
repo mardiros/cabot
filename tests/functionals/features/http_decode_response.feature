@@ -1,4 +1,3 @@
-
 Feature: As a user, I can get http response body on stdout
 
 @http

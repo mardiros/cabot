@@ -9,8 +9,23 @@ from functionals.fixtures import wsgi
 
 def run_command(context):
     def run_command_impl(command):
+        cmd = []
+        in_param = True
+        for part in command.split():
+            if in_param:
+                if part.startswith('\''):
+                    cmd.append(part[1:])
+                    in_param = False
+                else:
+                    cmd.append(part)
+            else:
+                if part.endswith('\''):
+                    in_param = True
+                    cmd[-1] += ' ' + part[:-1]
+                else:
+                    cmd[-1] += ' ' + part
         return subprocess.run(
-            command.split(),
+            cmd,
             capture_output=True,
             text=True,
         )
