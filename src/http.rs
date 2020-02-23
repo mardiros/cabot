@@ -443,71 +443,37 @@ async fn log_request(request: &[u8], verbose: bool) {
     }
 }
 
-/// Read plain text http request (no encryption)
-async fn from_http(
+/// Send the http request to the stream, and write the response back
+/// to the out parameter.
+async fn process_request(
     request: &Request,
-    client: &mut TcpStream,
+    stream: &mut TcpStream,
     out: &mut (dyn Write + Unpin),
     verbose: bool,
     read_timeout: u64,
     request_timeout: u64,
+    https: bool,
 ) -> RedirectResult<()> {
     let request_bytes = request.to_bytes();
     let raw_request = request_bytes.as_slice();
     log_request(&raw_request, verbose).await;
 
-    debug!("Sending request...");
-    client.write_all(&raw_request).await?;
-
-    let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
-
-    debug!("Reading response headers...");
-    http_decoder.read_headers().await?;
-
-    if request_timeout > 0 {
-        io::timeout(Duration::from_millis(request_timeout), async {
-            http_decoder.stream_response().await
-        })
-        .await
-        .map_err(|err| match err.kind() {
-            io::ErrorKind::TimedOut => {
-                if err.to_string() == "Read Timeout" {
-                    err
-                } else {
-                    io::Error::new(err.kind(), "Request Timeout".to_owned())
-                }
-            }
-            _ => err,
-        })?;
+    let mut ownable_tls_client: Option<TLSStream>;
+    let client: &mut (dyn Read + Unpin) = if https {
+        let mut tls_client = TLSStream::new(stream, request.host())?;
+        tls_client.starttls().await?;
+        debug!("Sending request...");
+        tls_client.write_all(&raw_request).await?;
+        ownable_tls_client = Some(tls_client);
+        ownable_tls_client.as_mut().unwrap()
     } else {
-        http_decoder.stream_response().await?;
-    }
-    Ok(())
-}
-
-/// Read TLS http request
-async fn from_https(
-    request: &Request,
-    client: &mut TcpStream,
-    out: &mut (dyn Write + Unpin),
-    verbose: bool,
-    read_timeout: u64,
-    request_timeout: u64,
-) -> RedirectResult<()> {
-    let request_bytes = request.to_bytes();
-    let raw_request = request_bytes.as_slice();
-    log_request(&raw_request, verbose).await;
-
-    let mut tls_client = TLSStream::new(client, request.host())?;
-    tls_client.starttls().await?;
-
-    debug!("Sending request...");
-    tls_client.write_all(&raw_request).await?;
+        debug!("Sending request...");
+        stream.write_all(&raw_request).await?;
+        stream
+    };
     debug!("Request sent");
-
     debug!("Decoding response...");
-    let mut http_decoder = HttpDecoder::new(out, &mut tls_client, read_timeout);
-
+    let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
     http_decoder.read_headers().await?;
 
     if request_timeout > 0 {
@@ -528,7 +494,6 @@ async fn from_https(
     } else {
         http_decoder.stream_response().await?;
     }
-
     Ok(())
 }
 
@@ -595,36 +560,26 @@ pub async fn http_query(
             _ => err,
         })?;
 
-        let resp = match request.scheme() {
-            "http" => {
-                from_http(
-                    request,
-                    &mut client,
-                    &mut out,
-                    verbose,
-                    read_timeout,
-                    request_timeout,
-                )
-                .await
-            }
-            "https" => {
-                from_https(
-                    request,
-                    &mut client,
-                    &mut out,
-                    verbose,
-                    read_timeout,
-                    request_timeout,
-                )
-                .await
-            }
-            _ => {
-                return Err(CabotError::SchemeError(format!(
-                    "Unrecognized scheme {}",
-                    request.scheme()
-                )))
-            }
-        };
+        let resp = process_request(
+            request,
+            &mut client,
+            &mut out,
+            verbose,
+            read_timeout,
+            request_timeout,
+            match request.scheme() {
+                "http" => false,
+                "https" => true,
+                _ => {
+                    return Err(CabotError::SchemeError(format!(
+                        "Unrecognized scheme {}",
+                        request.scheme()
+                    )))
+                }
+            },
+        )
+        .await;
+
         match resp {
             Err(RedirectError::Redirect(redir)) => {
                 if followed_redir <= 0 {
