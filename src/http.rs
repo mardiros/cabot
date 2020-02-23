@@ -1,5 +1,5 @@
 //! Low level and internal http and https implementation.
-
+use std::cmp;
 use std::collections::HashMap;
 use std::time::Duration;
 use std::vec::Vec;
@@ -7,7 +7,7 @@ use std::vec::Vec;
 use async_std::io::{self, stderr, Read, Result as IoResult, Write};
 use async_std::net::{SocketAddr, TcpStream};
 use async_std::prelude::*;
-use log::Level::Info;
+use log::Level::{Info, Warn};
 
 use super::asynctls::TLSStream;
 use super::constants;
@@ -155,7 +155,7 @@ impl<'a> HttpDecoder<'a> {
 
     /// read http headers
     async fn read_headers(&mut self) -> RedirectResult<()> {
-        info!("Reading headers");
+        info!("Reading response headers...");
         loop {
             let _count = self.chunk_read().await?;
             let res = self.process_headers().await?;
@@ -459,10 +459,9 @@ async fn from_http(
     debug!("Sending request...");
     client.write_all(&raw_request).await?;
 
-    debug!("Reading response headers...");
-
     let mut http_decoder = HttpDecoder::new(out, client, read_timeout);
 
+    debug!("Reading response headers...");
     http_decoder.read_headers().await?;
 
     if request_timeout > 0 {
@@ -554,7 +553,22 @@ pub async fn http_query(
     );
     let mut redir_req: Option<Request>;
     let mut request = request;
-    let mut max_redir = max_redir;
+    let mut followed_redir = max_redir;
+    let read_timeout = if request_timeout > 0 {
+        if verbose && read_timeout > request_timeout {
+            writeln!(
+                &mut stderr(),
+                "* Read timeout is greater than request timeout, overridden ({}ms)",
+                request_timeout,
+            )
+            .await
+            .unwrap();
+        }
+        cmp::min(read_timeout, request_timeout)
+    } else {
+        read_timeout
+    };
+    let mut result: CabotResult<()> = Ok(());
     loop {
         let authority = request.authority();
         let addr = match authorities.get(authority) {
@@ -611,39 +625,59 @@ pub async fn http_query(
                 )))
             }
         };
-        if let Err(RedirectError::Redirect(redir)) = resp {
-            if max_redir <= 0 {
+        match resp {
+            Err(RedirectError::Redirect(redir)) => {
+                if followed_redir <= 0 {
+                    if log_enabled!(Warn) {
+                        warn!("Maximum redirects followed ({})", max_redir);
+                    } else if verbose {
+                        writeln!(
+                            &mut stderr(),
+                            "* Maximum redirects followed ({})",
+                            max_redir
+                        )
+                        .await
+                        .unwrap();
+                    }
+                    return Err(CabotError::MaxRedirectionAttempt(max_redir));
+                }
+                let mut redir_req_builder = match redir {
+                    HTTPRedirect::HTTPMovedPermanently(url)
+                    | HTTPRedirect::HTTPFound(url)
+                    | HTTPRedirect::HTTPSeeOther(url) => RequestBuilder::new(url.as_str()),
+                    HTTPRedirect::HTTPPermanentRedirect(url)
+                    | HTTPRedirect::HTTPTemporaryRedirect(url) => {
+                        let mut req = RequestBuilder::new(url.as_str())
+                            .set_http_method(request.http_method());
+                        if let Some(body) = request.body() {
+                            req = req.set_body(body);
+                        }
+                        req
+                    }
+                };
+                for header in request.headers() {
+                    if header.to_ascii_uppercase().starts_with("USER-AGENT:") {
+                        let (_, ua) = header.split_at(11);
+                        redir_req_builder = redir_req_builder.set_user_agent(ua.trim());
+                    } else if header.to_ascii_uppercase().starts_with("SET-COOKIE:") {
+                        redir_req_builder = redir_req_builder.add_header(header);
+                    }
+                }
+                redir_req = Some(redir_req_builder.build()?);
+                request = redir_req.as_ref().unwrap();
+                followed_redir = followed_redir - 1;
+            }
+            Err(RedirectError::IOError(err)) => {
+                result = Err(CabotError::IOError(err));
                 break;
             }
-            let mut redir_req_builder = match redir {
-                HTTPRedirect::HTTPMovedPermanently(url)
-                | HTTPRedirect::HTTPFound(url)
-                | HTTPRedirect::HTTPSeeOther(url) => RequestBuilder::new(url.as_str()),
-                HTTPRedirect::HTTPPermanentRedirect(url)
-                | HTTPRedirect::HTTPTemporaryRedirect(url) => {
-                    let mut req =
-                        RequestBuilder::new(url.as_str()).set_http_method(request.http_method());
-                    if let Some(body) = request.body() {
-                        req = req.set_body(body);
-                    }
-                    req
-                }
-            };
-            for header in request.headers() {
-                if header.to_ascii_uppercase().starts_with("USER-AGENT:") {
-                    let (_, ua) = header.split_at(11);
-                    redir_req_builder = redir_req_builder.set_user_agent(ua.trim());
-                } else if header.to_ascii_uppercase().starts_with("SET-COOKIE:") {
-                    redir_req_builder = redir_req_builder.add_header(header);
-                }
+            Err(RedirectError::CabotError(err)) => {
+                result = Err(err);
+                break;
             }
-            redir_req = Some(redir_req_builder.build()?);
-            request = redir_req.as_ref().unwrap();
-            max_redir = max_redir - 1;
-        } else {
-            break;
+            _ => break,
         }
     }
     out.flush().await.unwrap();
-    Ok(())
+    result
 }

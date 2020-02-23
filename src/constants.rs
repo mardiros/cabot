@@ -19,6 +19,11 @@ pub fn user_agent() -> String {
 }
 
 // Size of the buffer while reading http socket
+#[cfg(feature = "functional_tests")]
+pub const BUFFER_PAGE_SIZE: usize = 4;
+
+// Size of the buffer while reading http socket
+#[cfg(not(feature = "functional_tests"))]
 pub const BUFFER_PAGE_SIZE: usize = 2048;
 
 lazy_static! {

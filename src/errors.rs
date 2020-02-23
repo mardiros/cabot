@@ -15,6 +15,7 @@ pub enum CabotError {
     HttpResponseParseError(String),
     OpaqueUrlError(String),
     SchemeError(String),
+    MaxRedirectionAttempt(u8),
     // Wrapped errors
     CertificateError(TLSError),
     EncodingError(FromUtf8Error),
@@ -37,6 +38,9 @@ impl Display for CabotError {
             CabotError::EncodingError(err) => format!("Utf8 Encoding Error: {}", err),
             CabotError::IOError(err) => format!("IO Error: {}", err),
             CabotError::UrlParseError(err) => format!("URL Parse Error: {}", err),
+            CabotError::MaxRedirectionAttempt(max_redir) => {
+                format!("Maximum redirection attempt: {}", max_redir)
+            }
         };
         write!(f, "{}", description)
     }

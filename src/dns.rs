@@ -1,10 +1,10 @@
 //! DNS Resolution
 
-use std::io::{stderr, Write};
 use std::time::Duration;
 
-use async_std::io;
+use async_std::io::{self, stderr};
 use async_std::net::{SocketAddr, ToSocketAddrs};
+use async_std::prelude::*;
 use log::Level::Info;
 
 use super::results::{CabotError, CabotResult};
@@ -51,6 +51,7 @@ impl Resolver {
                 authority,
                 addr
             )
+            .await
             .unwrap();
         }
         Ok(addr)
