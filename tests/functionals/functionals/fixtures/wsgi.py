@@ -183,6 +183,18 @@ Praesent eget euismod est, quis auctor erat.
         ]
         return status, headers, body
 
+    def timeout(self):
+        sleeptime = float(self.environ['QUERY_STRING'])
+        time.sleep(sleeptime / 1000)
+        status = '200 OK'
+        body = b"""It is working."""
+        headers = [
+            ('Date', 'Mon, 17 Feb 2020 21:11:21 GMT'),
+            ('Content-type', 'text/plain; charset=utf-8'),
+            ('Content-Length', str(len(body))),
+        ]
+        return status, headers, body
+
     def echo(self):
         status = '200 OK'
         stream = StringIO()
