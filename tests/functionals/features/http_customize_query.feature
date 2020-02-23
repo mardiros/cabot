@@ -52,3 +52,19 @@ And stdout display
     body: {"a": "b"}
     """
 And stderr is empty
+
+@http
+Scenario: Send custom user agent
+Given cabot
+When I run "cabot http://127.0.1:8000/echo -A Mozilla/5.0"
+Then the status code is "0"
+And stdout display
+    """
+    CONTENT_TYPE: text/plain
+    HTTP_CONNECTION: close
+    HTTP_HOST: localhost
+    HTTP_USER_AGENT: Mozilla/5.0
+    PATH_INFO: /echo
+    REQUEST_METHOD: GET
+    """
+And stderr is empty
