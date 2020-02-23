@@ -9,8 +9,8 @@ use std::net::{AddrParseError, SocketAddr};
 use std::pin::Pin;
 
 use async_std;
-use async_std::fs::OpenOptions;
-use async_std::io::{self, Write};
+use async_std::fs::{File, OpenOptions};
+use async_std::io::{self, Stdout, Write};
 use async_std::prelude::*;
 use async_std::task::Context;
 use async_std::task::Poll;
@@ -229,44 +229,38 @@ pub async fn run() -> CabotResult<()> {
 
     let request = builder.build()?;
 
-    if let Some(path) = matches.value_of("FILE") {
-        let mut f = OpenOptions::new()
+    let mut file: Option<File>;
+    let mut stdout: Option<Stdout>;
+
+    let mut out = if let Some(path) = matches.value_of("FILE") {
+        let f = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(path)
             .await
             .unwrap();
-        http::http_query(
-            &request,
-            &mut CabotBinWrite::new(&mut f, verbose),
-            &resolved,
-            verbose,
-            ipv4,
-            ipv6,
-            dns_timeout,
-            connect_timeout,
-            read_timeout,
-            request_timeout,
-            number_of_redirect,
-        )
-        .await?
+        file = Some(f);
+        CabotBinWrite::new(file.as_mut().unwrap(), verbose)
     } else {
-        http::http_query(
-            &request,
-            &mut CabotBinWrite::new(&mut io::stdout(), verbose),
-            &resolved,
-            verbose,
-            ipv4,
-            ipv6,
-            dns_timeout,
-            connect_timeout,
-            read_timeout,
-            request_timeout,
-            number_of_redirect,
-        )
-        .await?
+        stdout = Some(io::stdout());
+        CabotBinWrite::new(stdout.as_mut().unwrap(), verbose)
     };
+
+    http::http_query(
+        &request,
+        &mut out,
+        &resolved,
+        verbose,
+        ipv4,
+        ipv6,
+        dns_timeout,
+        connect_timeout,
+        read_timeout,
+        request_timeout,
+        number_of_redirect,
+    )
+    .await?;
     Ok(())
 }
 
