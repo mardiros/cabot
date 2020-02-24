@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## cabot 0.5.0 2019-02-24
+
+ * Implement redirection.
+ * Implement request, dns, connect and read timeout.
+ * Fix Chunked enconding.
+ * Fix -o option.
+ * Add a functionnal tests suite.
+
 ## cabot 0.4.0 2019-12-05
 
  * Use `async-std` instead of `std`
