@@ -24,27 +24,27 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?3 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?2 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?1 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?0 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /with-length HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     < HTTP/1.1 200 OK
@@ -85,87 +85,87 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?50 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?49 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?48 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?47 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?46 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?45 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?44 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?43 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?42 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?41 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?40 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?39 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?38 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?37 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?36 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?35 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?34 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Maximum redirects followed (16)
@@ -193,17 +193,17 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?5 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?4 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /redirect-count-down?3 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     * Maximum redirects followed (2)

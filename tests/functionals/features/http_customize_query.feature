@@ -11,7 +11,7 @@ And stdout display
     HTTP_CONNECTION: close
     HTTP_HEADER_NAME: whynot
     HTTP_HOST: localhost
-    HTTP_USER_AGENT: cabot/0.5.0
+    HTTP_USER_AGENT: cabot/0.5.1
     PATH_INFO: /echo
     REQUEST_METHOD: GET
     """
@@ -29,7 +29,7 @@ And stdout display
     HTTP_HEADER_NAME: A,B
     HTTP_HEADER_OTHER: C
     HTTP_HOST: localhost
-    HTTP_USER_AGENT: cabot/0.5.0
+    HTTP_USER_AGENT: cabot/0.5.1
     PATH_INFO: /echo
     REQUEST_METHOD: GET
     """
@@ -46,7 +46,7 @@ And stdout display
     CONTENT_TYPE: application/json
     HTTP_CONNECTION: close
     HTTP_HOST: localhost
-    HTTP_USER_AGENT: cabot/0.5.0
+    HTTP_USER_AGENT: cabot/0.5.1
     PATH_INFO: /echo
     REQUEST_METHOD: POST
     body: {"a": "b"}

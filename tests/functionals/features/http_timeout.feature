@@ -78,7 +78,7 @@ And stderr display
     * Read timeout is greater than request timeout, overridden (1000ms)
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /timeout?1100 HTTP/1.1
-    > User-Agent: cabot/0.5.0
+    > User-Agent: cabot/0.5.1
     > Connection: close
     >
     IO Error: Read Timeout
