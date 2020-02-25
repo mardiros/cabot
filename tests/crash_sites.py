@@ -37,9 +37,9 @@ def process_domain(domain, url, devnull):
     print('.', end='', flush=True)
     subprocess.run(
         [
-            './target/debug/cabot',
+            '../target/debug/cabot',
             url,
-            '--timeout',
+            '--max-time',
             '30',
             '--user-agent',
             'curl/7.68.0',
@@ -51,7 +51,7 @@ def process_domain(domain, url, devnull):
     )
     print('.', end='', flush=True)
     subprocess.run(
-        ['timeout', '30s', 'curl', url, '-o', curl_tmp],
+        ['curl', '--max-time', '30', '-o', curl_tmp, url],
         stdout=devnull,
         stderr=devnull,
     )
@@ -60,7 +60,7 @@ def process_domain(domain, url, devnull):
     eq = filecmp.cmp(cabot_tmp, curl_tmp)
     if not eq:
         subprocess.run(
-            ['timeout', '30s', 'curl', url, '-o', curl_rej_tmp],
+            ['curl', '--max-time', '30', '-o', curl_rej_tmp, url],
             stdout=devnull,
             stderr=devnull,
         )
@@ -89,7 +89,6 @@ def process_domain(domain, url, devnull):
 
 def main():
     clean_up()
-    return
     with open(os.devnull) as devnull:
         for (domain, url) in get_websites():
             try:

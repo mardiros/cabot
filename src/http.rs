@@ -33,7 +33,6 @@ enum TransferEncoding {
 #[derive(Debug, PartialEq)]
 enum TransferEncodingStatus {
     ReadingHeader,
-    ChunkHeader,
     ReadingBody(usize),
 }
 
@@ -143,15 +142,18 @@ impl<'a> HttpDecoder<'a> {
     fn drain_line(&mut self) -> Option<Vec<u8>> {
         debug!("Drain line...");
         if let Some(pos) = self.buffer.iter().position(|&x| x == b'\n') {
-            if self.buffer.get(pos - 1) == Some(&b'\r') {
+            if pos > 0 && self.buffer.get(pos - 1) == Some(&b'\r') {
                 let buffer = self.buffer.drain((pos + 1)..).collect();
                 let res = mem::replace(&mut self.buffer, buffer);
                 return Some(res);
             } else {
-                error!("No \\r");
+                warn!("Missing \\r");
+                let buffer = self.buffer.drain(pos..).collect();
+                let res = mem::replace(&mut self.buffer, buffer);
+                return Some(res);
             }
         } else {
-            error!("Not \\n yet");
+            debug!("Not \\n yet");
         }
         None
     }
@@ -317,7 +319,8 @@ impl<'a> HttpDecoder<'a> {
             }
             let cnt = self.chunk_read().await?;
             if cnt == 0 {
-                debug!("No more chunk data to read");
+                error!("No more chunk data to read");
+                break;
             }
         }
         Ok(())
@@ -356,62 +359,38 @@ impl<'a> HttpDecoder<'a> {
         if self.buffer.len() == 0 {
             return Ok(false);
         }
-        let mut body_chunk_size = 0;
-        let mut header_len: usize;
         loop {
-            header_len = 0;
             if self.transfer_encoding_status == TransferEncodingStatus::ReadingHeader {
                 debug!("Reading header in Transfer-Encoding chunked");
                 // we read the chunk size to drain
-                let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
-                    .splitn(self.buffer.as_slice(), 2)
-                    .collect();
-                if header.len() == 2 {
-                    if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
-                        if let Some(size) = header.get(1) {
-                            let size = size.as_bytes();
-                            header_len = size.len() + 2;
-                            let size = String::from_utf8_lossy(size).into_owned();
-                            body_chunk_size = usize::from_str_radix(size.as_str(), 16).unwrap();
-                            debug!("Chunk Size to read: {}", body_chunk_size);
-                            self.transfer_encoding_status = TransferEncodingStatus::ChunkHeader;
-                        } else {
-                            error!("Chunk Header is invalid");
-                        }
-                    } else {
-                        error!("Chunk Header has improper size");
-                        // else return Error
-                        // break;
+                let header = self.drain_line();
+                if header.is_none() {
+                    break;
+                }
+                let header = header.unwrap();
+                let size = String::from_utf8_lossy(header.as_slice());
+                if size.len() > 2 {
+                    let body_chunk_size =
+                        usize::from_str_radix(size.trim(), 16).map_err(|_err| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Chunk part should be an hexa string",
+                            )
+                        })?;
+                    if body_chunk_size == 0 {
+                        error!("Reading last chars...");
+                        self.drain_line();
+                        return Ok(true);
                     }
+                    self.transfer_encoding_status =
+                        TransferEncodingStatus::ReadingBody(body_chunk_size);
                 } else {
-                    debug!(
-                        "Chunked not complete: {}",
-                        String::from_utf8_lossy(self.buffer.as_slice())
-                    );
+                    error!("Chunk Header has improper size: {:?}, {}", size, size.len());
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Chunk part header is empty, shoule be an hexa",
+                    ));
                 }
-            }
-
-            if self.transfer_encoding_status == TransferEncodingStatus::ChunkHeader {
-                if body_chunk_size == 0 {
-                    debug!(
-                        "0 chunked size received: {}",
-                        String::from_utf8_lossy(self.buffer.as_slice())
-                    );
-                    self.buffer.clear(); // should we check that it is '0\r\n' ?
-                    return Ok(true);
-                }
-
-                debug!(
-                    "Before header cleanup: {}",
-                    String::from_utf8_lossy(self.buffer.as_slice())
-                );
-                self.buffer = drain_buffer(&mut self.buffer, header_len);
-                debug!(
-                    "After header cleanup: {}",
-                    String::from_utf8_lossy(self.buffer.as_slice())
-                );
-                self.transfer_encoding_status =
-                    TransferEncodingStatus::ReadingBody(body_chunk_size);
             }
 
             if let TransferEncodingStatus::ReadingBody(buf_size) = self.transfer_encoding_status {
@@ -427,7 +406,6 @@ impl<'a> HttpDecoder<'a> {
                     self.writer.write(self.buffer.as_slice()).await?;
                     self.buffer = drain_buffer(&mut buffer, 2); // CRLF
                     self.transfer_encoding_status = TransferEncodingStatus::ReadingHeader;
-                    body_chunk_size = 0;
                     if self.buffer.len() < 4 {
                         break;
                     }
