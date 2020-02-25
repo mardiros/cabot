@@ -27,7 +27,6 @@ pub const BUFFER_PAGE_SIZE: usize = 4;
 pub const BUFFER_PAGE_SIZE: usize = 2048;
 
 lazy_static! {
-    pub static ref SPLIT_HEADERS_RE: BytesRegex = BytesRegex::new(r"\r\n\r\n").unwrap();
     pub static ref SPLIT_HEADER_BRE: BytesRegex = BytesRegex::new(r"\r\n").unwrap();
     pub static ref GET_CHUNK_SIZE: BytesRegex = BytesRegex::new(r"([0-9A-Fa-f]+)").unwrap();
     pub static ref SPLIT_HEADER_RE: Regex = Regex::new(r"\r\n").unwrap();
