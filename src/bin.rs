@@ -300,15 +300,12 @@ impl<'a> CabotBinWrite<'a> {
         }
     }
     fn display_headers(&self, buf: &[u8]) {
-        let headers = String::from_utf8_lossy(buf);
-        let split: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-        if log_enabled!(Info) {
-            for part in split {
-                info!("< {}", part);
-            }
-        } else if self.verbose {
-            for part in split {
-                eprintln!("< {}", part);
+        for hdr in buf.split(|&x| x == b'\n') {
+            let hdr = String::from_utf8_lossy(hdr);
+            if log_enabled!(Info) {
+                info!("< {}", hdr);
+            } else if self.verbose {
+                eprintln!("< {}", hdr);
             }
         }
     }

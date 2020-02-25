@@ -2,8 +2,6 @@
 //!
 //! [see whats inside](../../src/cabot/constants.rs.html).
 
-use regex::Regex;
-
 /// Version of cabot
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NUMBER_OF_REDIRECT: u8 = 16;
@@ -24,7 +22,3 @@ pub const BUFFER_PAGE_SIZE: usize = 4;
 // Size of the buffer while reading http socket
 #[cfg(not(feature = "functional_tests"))]
 pub const BUFFER_PAGE_SIZE: usize = 2048;
-
-lazy_static! {
-    pub static ref SPLIT_HEADER_RE: Regex = Regex::new(r"\r\n").unwrap();
-}
