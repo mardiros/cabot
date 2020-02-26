@@ -31,8 +31,6 @@ functional_tests = []
 
 clap = "2.33.0"
 log = "0.4.8"
-lazy_static = "1.4.0"
-regex = "1.3.1"
 
 rustls = "0.17.0"
 webpki = "0.21.2"

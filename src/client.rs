@@ -136,47 +136,33 @@ impl CabotLibWrite {
     }
 
     fn split_headers(&mut self, buf: &[u8]) {
-        let headers = String::from_utf8_lossy(buf);
-        let mut headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-        if headers.len() == 0 {
-            error!("No headers in the response");
-            self.response_builder = ResponseBuilder::new();
-            return;
-        }
-        let status_line = headers.remove(0);
-        debug!("Adding status line {}", status_line);
-        let builder = ResponseBuilder::new();
-        let mut builder = builder.set_status_line(status_line);
-
-        let mut iter_header = headers.iter().peekable();
-        let header = iter_header.next();
-        if header.is_some() {
-            let buf = header.unwrap();
-            let mut header = String::with_capacity(buf.len() * 2);
-            header.push_str(buf);
-            loop {
-                {
-                    let buf = iter_header.peek();
-                    if buf.is_none() {
-                        builder = builder.add_header(header.as_str());
-                        break;
-                    }
-                    let buf = buf.unwrap();
-                    if buf.starts_with(' ') || buf.starts_with('\t') {
-                        debug!("Obsolete line folded header reveived in {}", header);
-                        header.push_str(" ");
-                        header.push_str(buf.trim_start());
-                    } else {
-                        debug!("Adding header {}", header);
-                        builder = builder.add_header(header.as_str());
+        let mut builder = ResponseBuilder::new();
+        if let Some(pos) = buf.iter().position(|&x| x == b'\n') {
+            let (status_line, hdrs) = buf.split_at(pos);
+            let status_line = String::from_utf8_lossy(status_line);
+            builder = builder.set_status_line(status_line.trim_end());
+            let mut header = "".to_owned();
+            for hdr in hdrs.split(|&x| x == b'\n') {
+                let hdr = String::from_utf8_lossy(hdr);
+                if hdr.starts_with(' ') || hdr.starts_with('\t') {
+                    debug!("Obsolete line folded header reveived in {}", header);
+                    header.push_str(" ");
+                    header.push_str(hdr.trim());
+                } else {
+                    let clean_hdr = header.trim();
+                    if clean_hdr.len() > 0 {
+                        builder = builder.add_header(clean_hdr.trim());
                         header.clear();
-                        header.push_str(buf);
                     }
+                    header.push_str(hdr.trim());
                 }
-                let _ = iter_header.next();
             }
+            let clean_hdr = header.trim();
+            if clean_hdr.len() > 0 {
+                builder = builder.add_header(clean_hdr.trim());
+            }
+            self.response_builder = builder;
         }
-        self.response_builder = builder;
     }
 
     pub fn response(&self) -> CabotResult<Response> {

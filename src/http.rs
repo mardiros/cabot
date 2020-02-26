@@ -1,6 +1,7 @@
 //! Low level and internal http and https implementation.
 use std::cmp;
 use std::collections::HashMap;
+use std::mem;
 use std::time::Duration;
 use std::vec::Vec;
 
@@ -32,7 +33,6 @@ enum TransferEncoding {
 #[derive(Debug, PartialEq)]
 enum TransferEncodingStatus {
     ReadingHeader,
-    ChunkHeader,
     ReadingBody(usize),
 }
 
@@ -116,6 +116,8 @@ struct HttpDecoder<'a> {
     transfer_encoding_status: TransferEncodingStatus,
     /// max time to wait while reading chunks.
     read_timeout: Duration,
+    /// status code
+    status_code: [u8; 3],
 }
 
 impl<'a> HttpDecoder<'a> {
@@ -132,7 +134,28 @@ impl<'a> HttpDecoder<'a> {
             transfer_encoding: TransferEncoding::None,
             transfer_encoding_status: TransferEncodingStatus::ReadingHeader,
             read_timeout: Duration::from_millis(read_timeout),
+            status_code: b"000".to_owned(),
         }
+    }
+
+    /// extract the first line of the buffer in case there is some
+    fn drain_line(&mut self) -> Option<Vec<u8>> {
+        debug!("Drain line...");
+        if let Some(pos) = self.buffer.iter().position(|&x| x == b'\n') {
+            if pos > 0 && self.buffer.get(pos - 1) == Some(&b'\r') {
+                let buffer = self.buffer.drain((pos + 1)..).collect();
+                let res = mem::replace(&mut self.buffer, buffer);
+                return Some(res);
+            } else {
+                warn!("Missing \\r");
+                let buffer = self.buffer.drain(pos..).collect();
+                let res = mem::replace(&mut self.buffer, buffer);
+                return Some(res);
+            }
+        } else {
+            debug!("Not \\n yet");
+        }
+        None
     }
 
     /// Read a chunk from the reader to the buffer.
@@ -154,13 +177,102 @@ impl<'a> HttpDecoder<'a> {
     }
 
     /// read http headers
-    async fn read_headers(&mut self) -> RedirectResult<()> {
-        info!("Reading response headers...");
+    async fn read_status_line(&mut self) -> CabotResult<Vec<u8>> {
+        info!("Reading status line...");
         loop {
             let _count = self.chunk_read().await?;
-            let res = self.process_headers().await?;
-            if let Some(_) = res {
-                break;
+            if let Some(line) = self.drain_line() {
+                if let Some(pos) = line.iter().position(|&x| x == b' ') {
+                    if pos + 3 < line.len() {
+                        self.status_code = [
+                            line[pos + 1].clone(),
+                            line[pos + 2].clone(),
+                            line[pos + 3].clone(),
+                        ];
+                    }
+                    // else error!
+                } // else error
+                return Ok(line);
+            }
+        }
+    }
+
+    /// read http headers
+    async fn read_headers(&mut self) -> RedirectResult<()> {
+        info!("Reading response headers...");
+        let mut headers_buf = self.read_status_line().await?;
+        info!("Reading response headers...");
+        'outer: loop {
+            while let Some(line) = self.drain_line() {
+                self.process_header(line.as_slice())?; // a bit wrong, header can be multiline
+                headers_buf.extend_from_slice(line.as_slice());
+                debug!("line {}", String::from_utf8_lossy(line.as_slice()));
+                if line.len() == 2 {
+                    break 'outer; // CRLF
+                }
+            }
+            let _count = self.chunk_read().await?;
+        }
+        self.writer.write(headers_buf.as_slice()).await.unwrap();
+        Ok(())
+    }
+    fn process_transfer_encoding(&mut self, header_value: &str) {
+        let tenc = header_value.trim();
+        debug!("transfer encoding: {:?}", tenc);
+        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
+    }
+
+    fn process_content_length(&mut self, header_value: &str) {
+        let clength = header_value.trim();
+        debug!("content length: {:?}", clength);
+        let clength = usize::from_str_radix(clength, 10).unwrap();
+        self.transfer_encoding = TransferEncoding::ContentLength(clength);
+    }
+
+    fn process_location(&self, header_value: &str) -> RedirectResult<()> {
+        let loc = header_value.trim().to_owned();
+        debug!("location: {:?}", loc);
+        match &self.status_code {
+            b"301" => {
+                return Err(RedirectError::Redirect(HTTPRedirect::HTTPMovedPermanently(
+                    loc,
+                )))
+            }
+            b"302" => return Err(RedirectError::Redirect(HTTPRedirect::HTTPFound(loc))),
+            b"303" => return Err(RedirectError::Redirect(HTTPRedirect::HTTPSeeOther(loc))),
+            b"307" => {
+                return Err(RedirectError::Redirect(
+                    HTTPRedirect::HTTPTemporaryRedirect(loc),
+                ))
+            }
+            b"308" => {
+                return Err(RedirectError::Redirect(
+                    HTTPRedirect::HTTPPermanentRedirect(loc),
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn process_header(&mut self, header: &[u8]) -> RedirectResult<()> {
+        if let Some(pos) = header.iter().position(|&x| x == b':') {
+            let header = String::from_utf8_lossy(header);
+            let (key, val) = header.split_at(pos);
+            let key = key.to_uppercase().replace("-", "_");
+            let hdr = &val[1..];
+            match key.as_str() {
+                "TRANSFER_ENCODING" => {
+                    self.process_transfer_encoding(hdr);
+                }
+                "CONTENT_LENGTH" => {
+                    self.process_content_length(hdr);
+                }
+                "LOCATION" => {
+                    if self.status_code[0] == b'3' {
+                        self.process_location(hdr)?;
+                    }
+                }
+                _ => (),
             }
         }
         Ok(())
@@ -207,7 +319,8 @@ impl<'a> HttpDecoder<'a> {
             }
             let cnt = self.chunk_read().await?;
             if cnt == 0 {
-                debug!("No more chunk data to read");
+                error!("No more chunk data to read");
+                break;
             }
         }
         Ok(())
@@ -237,82 +350,6 @@ impl<'a> HttpDecoder<'a> {
         self.writer.flush().await
     }
 
-    /// Process headers to define the  body decoding strategy and
-    /// to follow redirections.
-    async fn process_headers(&mut self) -> RedirectResult<Option<usize>> {
-        let ret = {
-            let resp_header: Vec<&[u8]> = constants::SPLIT_HEADERS_RE
-                .splitn(self.buffer.as_slice(), 2)
-                .collect();
-            if resp_header.len() == 2 {
-                // We have the response headers
-
-                let http_ver_headers = resp_header.get(0).unwrap().clone();
-                let (_http_ver, headers) = http_ver_headers.split_at(9);
-                if headers.starts_with(b"3") || headers.starts_with(b"3") {
-                    let (code, _) = headers.split_at(3);
-                    if let Some(header) = constants::LOCATION.captures(headers) {
-                        if let Some(loc) = header.get(1) {
-                            let loc = String::from_utf8_lossy(loc.as_bytes()).into_owned();
-                            match code {
-                                b"301" => {
-                                    return Err(RedirectError::Redirect(
-                                        HTTPRedirect::HTTPMovedPermanently(loc),
-                                    ))
-                                }
-                                b"302" => {
-                                    return Err(RedirectError::Redirect(HTTPRedirect::HTTPFound(
-                                        loc,
-                                    )))
-                                }
-                                b"303" => {
-                                    return Err(RedirectError::Redirect(
-                                        HTTPRedirect::HTTPSeeOther(loc),
-                                    ))
-                                }
-                                b"307" => {
-                                    return Err(RedirectError::Redirect(
-                                        HTTPRedirect::HTTPTemporaryRedirect(loc),
-                                    ))
-                                }
-                                b"308" => {
-                                    return Err(RedirectError::Redirect(
-                                        HTTPRedirect::HTTPPermanentRedirect(loc),
-                                    ))
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
-                }
-
-                if let Some(header) = constants::TRANSFER_ENCODING.captures(headers) {
-                    if let Some(tenc) = header.get(1) {
-                        self.transfer_encoding = TransferEncoding::from(tenc.as_bytes());
-                    }
-                } else if let Some(header) = constants::CONTENT_LENGTH.captures(headers) {
-                    if let Some(clength) = header.get(1) {
-                        let clength = String::from_utf8_lossy(clength.as_bytes()).into_owned();
-                        let clength = usize::from_str_radix(clength.as_str(), 10).unwrap();
-                        self.transfer_encoding = TransferEncoding::ContentLength(clength);
-                    }
-                }
-                let resp = http_ver_headers.len();
-                self.writer.write(http_ver_headers).await.unwrap();
-                Some(resp + 4) // + CRLF CRLF
-            } else {
-                None
-            }
-        };
-        if let Some(to_drain) = ret {
-            self.buffer = drain_buffer(&mut self.buffer, to_drain);
-            info!("End of Headers reached");
-            debug!("Transfer encoding: {:?}", self.transfer_encoding);
-            debug!("{:?}", String::from_utf8_lossy(self.buffer.as_slice()));
-        }
-        Ok(ret)
-    }
-
     /// Process the data in the buffer.
     async fn process_chunk(&mut self) -> IoResult<bool> {
         debug!(
@@ -322,62 +359,38 @@ impl<'a> HttpDecoder<'a> {
         if self.buffer.len() == 0 {
             return Ok(false);
         }
-        let mut body_chunk_size = 0;
-        let mut header_len: usize;
         loop {
-            header_len = 0;
             if self.transfer_encoding_status == TransferEncodingStatus::ReadingHeader {
                 debug!("Reading header in Transfer-Encoding chunked");
                 // we read the chunk size to drain
-                let header: Vec<&[u8]> = constants::SPLIT_HEADER_BRE
-                    .splitn(self.buffer.as_slice(), 2)
-                    .collect();
-                if header.len() == 2 {
-                    if let Some(header) = constants::GET_CHUNK_SIZE.captures(header[0]) {
-                        if let Some(size) = header.get(1) {
-                            let size = size.as_bytes();
-                            header_len = size.len() + 2;
-                            let size = String::from_utf8_lossy(size).into_owned();
-                            body_chunk_size = usize::from_str_radix(size.as_str(), 16).unwrap();
-                            debug!("Chunk Size to read: {}", body_chunk_size);
-                            self.transfer_encoding_status = TransferEncodingStatus::ChunkHeader;
-                        } else {
-                            error!("Chunk Header is invalid");
-                        }
-                    } else {
-                        error!("Chunk Header has improper size");
-                        // else return Error
-                        // break;
+                let header = self.drain_line();
+                if header.is_none() {
+                    break;
+                }
+                let header = header.unwrap();
+                let size = String::from_utf8_lossy(header.as_slice());
+                if size.len() > 2 {
+                    let body_chunk_size =
+                        usize::from_str_radix(size.trim(), 16).map_err(|_err| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Chunk part should be an hexa string",
+                            )
+                        })?;
+                    if body_chunk_size == 0 {
+                        error!("Reading last chars...");
+                        self.drain_line();
+                        return Ok(true);
                     }
+                    self.transfer_encoding_status =
+                        TransferEncodingStatus::ReadingBody(body_chunk_size);
                 } else {
-                    debug!(
-                        "Chunked not complete: {}",
-                        String::from_utf8_lossy(self.buffer.as_slice())
-                    );
+                    error!("Chunk Header has improper size: {:?}, {}", size, size.len());
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Chunk part header is empty, shoule be an hexa",
+                    ));
                 }
-            }
-
-            if self.transfer_encoding_status == TransferEncodingStatus::ChunkHeader {
-                if body_chunk_size == 0 {
-                    debug!(
-                        "0 chunked size received: {}",
-                        String::from_utf8_lossy(self.buffer.as_slice())
-                    );
-                    self.buffer.clear(); // should we check that it is '0\r\n' ?
-                    return Ok(true);
-                }
-
-                debug!(
-                    "Before header cleanup: {}",
-                    String::from_utf8_lossy(self.buffer.as_slice())
-                );
-                self.buffer = drain_buffer(&mut self.buffer, header_len);
-                debug!(
-                    "After header cleanup: {}",
-                    String::from_utf8_lossy(self.buffer.as_slice())
-                );
-                self.transfer_encoding_status =
-                    TransferEncodingStatus::ReadingBody(body_chunk_size);
             }
 
             if let TransferEncodingStatus::ReadingBody(buf_size) = self.transfer_encoding_status {
@@ -393,7 +406,6 @@ impl<'a> HttpDecoder<'a> {
                     self.writer.write(self.buffer.as_slice()).await?;
                     self.buffer = drain_buffer(&mut buffer, 2); // CRLF
                     self.transfer_encoding_status = TransferEncodingStatus::ReadingHeader;
-                    body_chunk_size = 0;
                     if self.buffer.len() < 4 {
                         break;
                     }
@@ -408,38 +420,38 @@ impl<'a> HttpDecoder<'a> {
     }
 }
 
+async fn log_req_line(line: &str, verbose: bool) {
+    let line = format!("> {}", line);
+    let line = line.trim_end();
+    if log_enabled!(Info) {
+        info!("{}", line);
+    } else if verbose {
+        writeln!(&mut stderr(), "{}", line).await.unwrap();
+    }
+}
+
 /// log the request.
 async fn log_request(request: &[u8], verbose: bool) {
     if !log_enabled!(Info) && !verbose {
         return;
     }
-    let request: Vec<&[u8]> = constants::SPLIT_HEADERS_RE.splitn(request, 2).collect();
-    let headers = String::from_utf8_lossy(&request[0]);
-    let headers: Vec<&str> = constants::SPLIT_HEADER_RE.split(&headers).collect();
-    let bodylen = if request.len() == 2 {
-        let body = &request[1];
-        body.len()
-    } else {
-        0
-    };
-    if log_enabled!(Info) {
-        for header in headers {
-            info!("> {}", header);
+    let mut request = request;
+    loop {
+        if let Some(pos) = request.iter().position(|&x| x == b'\n') {
+            let (line, req) = request.split_at(pos);
+            let line = String::from_utf8_lossy(line);
+            debug!("Pos {}, Len {}", pos, line.len());
+            log_req_line(&line, verbose).await;
+            request = &req[1..];
+            if line.len() <= 2 {
+                break;
+            }
         }
-        if bodylen > 0 {
-            info!("> [{} bytes]", bodylen);
-        }
-        info!(">");
-    } else if verbose {
-        for header in headers {
-            writeln!(&mut stderr(), "> {}", header).await.unwrap();
-        }
-        if bodylen > 0 {
-            writeln!(&mut stderr(), "> [{} bytes]", bodylen)
-                .await
-                .unwrap();
-        }
-        writeln!(&mut stderr(), ">").await.unwrap();
+    }
+    let bodylen = request.len();
+    if bodylen > 0 {
+        let msg = format!("[{} bytes]", bodylen);
+        log_req_line(msg.as_str(), verbose).await;
     }
 }
 
