@@ -24,7 +24,7 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /no-length HTTP/1.1
-    > User-Agent: cabot/0.5.1
+    > User-Agent: cabot/0.6.0
     > Connection: close
     >
     < HTTP/1.1 200 OK
@@ -57,7 +57,7 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /with-length HTTP/1.1
-    > User-Agent: cabot/0.5.1
+    > User-Agent: cabot/0.6.0
     > Connection: close
     >
     < HTTP/1.1 200 OK
@@ -81,7 +81,7 @@ And stderr display
     """
     * Authority 127.0.0.1:8000 has been resolved to 127.0.0.1:8000
     > GET /small-chunked HTTP/1.1
-    > User-Agent: cabot/0.5.1
+    > User-Agent: cabot/0.6.0
     > Connection: close
     >
     < HTTP/1.1 200 OK
