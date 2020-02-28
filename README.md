@@ -15,9 +15,13 @@ Take a look at [the documentation for usage](https://docs.rs/cabot/).
 Unlike known alternatives, cabot does not rely on OpenSSL to perform https,
 but use [rustls](https://crates.io/crates/rustls) instead.
 
-## Cabot is also a command line tool ala curl: `cabot <url>`
+## Cabot is also a command line tool ala curl.
 
-Use `-h` for more options
+Usge:
+
+   cabot URL
+
+Use `-h` for more options.
 
 ## Features
 
