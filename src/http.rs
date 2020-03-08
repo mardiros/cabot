@@ -148,7 +148,7 @@ impl<'a> HttpDecoder<'a> {
                 return Some(res);
             } else {
                 warn!("Missing \\r");
-                let buffer = self.buffer.drain(pos..).collect();
+                let buffer = self.buffer.drain((pos + 1)..).collect();
                 let res = mem::replace(&mut self.buffer, buffer);
                 return Some(res);
             }
