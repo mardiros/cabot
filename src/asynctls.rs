@@ -116,8 +116,7 @@ impl<'a> Read for TLSStream<'a> {
 
         let mut tcp_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
 
-        let count =
-            futures::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
+        let count = futures::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
 
         match count {
             Err(err) => {
