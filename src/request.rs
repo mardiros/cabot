@@ -22,6 +22,11 @@ use url::{self, Url};
 use super::constants;
 use super::results::{CabotError, CabotResult};
 
+#[cfg(feature = "json")]
+use serde::Serialize;
+#[cfg(feature = "json")]
+use serde_json;
+
 /// An HTTP Request representation.
 ///
 /// Request is build using [RequestBuilder](../request/struct.RequestBuilder.html)
@@ -270,6 +275,14 @@ impl RequestBuilder {
         self.set_body(body.as_bytes())
     }
 
+    /// Set a body to send in the query. By default a query has no body.
+    /// This method panic if body is not deserializable.
+    #[cfg(feature = "json")]
+    pub fn set_body_as_json<T: Serialize>(self, body: &T) -> Self {
+        let deser = serde_json::to_string(body).expect("Cannot deserialize body");
+        let self_ = self.add_header("Content-Type: application/json");
+        self_.set_body_as_str(deser.as_str())
+    }
     /// Construct the [Request](../request/struct.Request.html).
     /// To perform the query, a [Client](../client/struct.Client.html)
     /// has to be created.
