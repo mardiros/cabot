@@ -4,6 +4,8 @@ use std::mem;
 use std::net::SocketAddr;
 use std::pin::Pin;
 
+use futures::future::{BoxFuture, Future};
+
 use async_std::io::{self, Write};
 use async_std::task::Context;
 use async_std::task::Poll;
@@ -28,7 +30,7 @@ pub struct Client {
     max_redir: u8,
 }
 
-impl Client {
+impl<'a> Client {
     /// Construct a new `Client`
     pub fn new() -> Self {
         Client {
@@ -98,25 +100,65 @@ impl Client {
         self.max_redir = max_redir;
     }
 
-    /// Execute the query [Request](../request/struct.Request.html) and
+    /// Execute the [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
-    pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
-        let mut out = CabotLibWrite::new();
-        http::http_query(
-            &request,
-            &mut out,
-            &self.authorities,
-            self.verbose,
-            self.ipv4,
-            self.ipv6,
-            self.dns_timeout,
-            self.connect_timeout,
-            self.read_timeout,
-            self.request_timeout,
-            self.max_redir,
-        )
-        .await?;
-        out.response()
+    pub async fn execute(
+        &self,
+        request: &Request,
+    ) -> CabotResult<Response> {
+        self.execute_fut(request).await
+    }
+
+    /// Execute the [Request](../request/struct.Request.html) and
+    /// return the associate [Response](../response/struct.Response.html) in a box
+    /// in order to user it in a async-std task.
+    pub fn execute_box(
+        &'a self,
+        request: &'a Request,
+    ) -> BoxFuture<'a, CabotResult<Response>> {
+        let fut = Box::pin(self.execute_fut(request));
+        Box::pin(ResponseFuture { fut })
+    }
+
+    /// Execute the [Request](../request/struct.Request.html) and
+    /// return a Future instance in order to use it Client public api.
+    fn execute_fut(
+        &'a self,
+        request: &'a Request,
+    ) -> impl Future<Output = CabotResult<Response>> + 'a {
+        async move {
+            let mut out = CabotLibWrite::new();
+            http::http_query(
+                request,
+                &mut out,
+                &self.authorities,
+                self.verbose,
+                self.ipv4,
+                self.ipv6,
+                self.dns_timeout,
+                self.connect_timeout,
+                self.read_timeout,
+                self.request_timeout,
+                self.max_redir,
+            )
+            .await?;
+            out.response()
+        }
+    }
+}
+
+/// A Future that implement Send to use Client inside task::spwan
+pub struct ResponseFuture<'a> {
+    fut: Pin<Box<dyn Future<Output = CabotResult<Response>> + 'a>>,
+}
+
+unsafe impl<'a> Send for ResponseFuture<'a> {}
+
+impl<'a> Future for ResponseFuture<'a> {
+    type Output = CabotResult<Response>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.fut).poll(cx)
     }
 }
 

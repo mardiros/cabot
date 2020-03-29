@@ -50,7 +50,7 @@ impl<'a> TLSStream<'a> {
             tlsclient: create_client(host)?,
         })
     }
-    /// Call it just after creating the sream
+    /// Call it just after creating the stream
     pub async fn starttls(&mut self) -> CabotResult<()> {
         let mut buf_tlswrite: Vec<u8> = Vec::new();
         let mut read_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
@@ -116,8 +116,7 @@ impl<'a> Read for TLSStream<'a> {
 
         let mut tcp_buf: [u8; constants::BUFFER_PAGE_SIZE] = [0; constants::BUFFER_PAGE_SIZE];
 
-        let count =
-            futures_core::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
+        let count = futures::ready!(Pin::new(&mut self_.tcpstream).poll_read(cx, &mut tcp_buf[..]));
 
         match count {
             Err(err) => {
@@ -160,7 +159,7 @@ impl<'a> Write for TLSStream<'a> {
             debug!("Write {} TLS Ciphered bytes", count);
         }
         let stream = Pin::new(&mut *self_.tcpstream);
-        let count = futures_core::ready!(stream.poll_write(cx, buf_tlswrite.as_slice()))?;
+        let count = futures::ready!(stream.poll_write(cx, buf_tlswrite.as_slice()))?;
         buf_tlswrite.clear();
         debug!("Write {} TLS Ciphered bytes", count);
         Poll::Ready(Ok(ret))
