@@ -102,20 +102,14 @@ impl<'a> Client {
 
     /// Execute the [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html).
-    pub async fn execute(
-        &self,
-        request: &Request,
-    ) -> CabotResult<Response> {
+    pub async fn execute(&self, request: &Request) -> CabotResult<Response> {
         self.execute_fut(request).await
     }
 
     /// Execute the [Request](../request/struct.Request.html) and
     /// return the associate [Response](../response/struct.Response.html) in a box
     /// in order to user it in a async-std task.
-    pub fn execute_box(
-        &'a self,
-        request: &'a Request,
-    ) -> BoxFuture<'a, CabotResult<Response>> {
+    pub fn execute_box(&'a self, request: &'a Request) -> BoxFuture<'a, CabotResult<Response>> {
         let fut = Box::pin(self.execute_fut(request));
         Box::pin(ResponseFuture { fut })
     }

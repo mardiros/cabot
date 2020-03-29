@@ -22,6 +22,11 @@
 
 use super::results::{CabotError, CabotResult};
 
+#[cfg(feature = "json")]
+use serde::de::DeserializeOwned;
+#[cfg(feature = "json")]
+use serde_json;
+
 /// Represent the parsed HTTP response.
 #[derive(Debug)]
 pub struct Response {
@@ -104,6 +109,12 @@ impl Response {
                 String::from_utf8(body_vec)?
             }
         };
+        Ok(body)
+    }
+
+    #[cfg(feature = "json")]
+    pub fn json<T: DeserializeOwned>(&self) -> CabotResult<T> {
+        let body = serde_json::from_slice(self.body.as_ref().unwrap_or(&Vec::new()).as_slice())?;
         Ok(body)
     }
 }
