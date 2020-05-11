@@ -272,6 +272,7 @@ impl RequestBuilder {
 
     /// Set a body to send in the query. By default a query has no body.
     pub fn set_body_as_str(self, body: &str) -> Self {
+        debug!("Set request body: {}", body);
         self.set_body(body.as_bytes())
     }
 

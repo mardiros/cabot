@@ -4,11 +4,11 @@ use std::mem;
 use std::net::SocketAddr;
 use std::pin::Pin;
 
-use futures::future::{BoxFuture, Future};
-
 use async_std::io::{self, Write};
 use async_std::task::Context;
 use async_std::task::Poll;
+use futures::future::{BoxFuture, Future};
+use log::Level::Debug;
 
 use super::constants;
 use super::http;
@@ -221,7 +221,10 @@ impl Write for CabotLibWrite {
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<io::Result<()>> {
         let self_ = Pin::get_mut(self);
-        info!("Adding body {:?}", self_.body_buffer);
+        if log_enabled!(Debug) {
+            let body = String::from_utf8_lossy(self_.body_buffer.as_slice());
+            debug!("Adding body {:?}", body);
+        }
         let builder = mem::replace(&mut self_.response_builder, ResponseBuilder::new());
         self_.response_builder = builder.set_body(self_.body_buffer.as_slice());
         Poll::Ready(Ok(()))
