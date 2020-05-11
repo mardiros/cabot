@@ -240,6 +240,12 @@ impl RequestBuilder {
         self
     }
 
+    /// Add many headers.
+    pub fn append_querystring(mut self, name: &str, value: &str) -> Self {
+        self.url = self.url.map(|mut url| {url.query_pairs_mut().append_pair(name, value); url});
+        self
+    }
+
     /// Override the [default user-agent](../constants/index.html)
     ///
     /// Important: don't add a user_agent usering the `add_header` function
@@ -422,6 +428,8 @@ mod tests {
             .set_user_agent("anonymized")
             .add_header("Content-Type: application/json")
             .add_headers(&["Accept-Encoding: deflate", "Accept-Language: fr"])
+            .append_querystring("key", "val")
+            .append_querystring("ké", "väl")
             .set_body_as_str("{}");
         let body: &[u8] = &[123, 125];
         let request = builder.build().unwrap();
@@ -430,7 +438,7 @@ mod tests {
         assert_eq!(request.body_as_string().unwrap().unwrap(), "{}".to_string());
         assert_eq!(request.scheme(), "http".to_string());
         assert_eq!(request.http_method(), "POST".to_string());
-        assert_eq!(request.request_uri(), "/");
+        assert_eq!(request.request_uri(), "/?key=val&k%C3%A9=v%C3%A4l");
         assert_eq!(request.http_version(), "HTTP/1.0".to_string());
         assert_eq!(
             request.headers,
