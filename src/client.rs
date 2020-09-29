@@ -72,7 +72,7 @@ impl<'a> Client {
     pub fn set_read_timeout(&mut self, timeout: u64) {
         self.read_timeout = timeout * 1000;
     }
-    /// Set the request timeout in milliseconds.
+    /// Set the request timeout in seconds.
     pub fn set_request_timeout(&mut self, timeout: u64) {
         self.request_timeout = timeout * 1000;
     }
