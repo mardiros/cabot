@@ -8,15 +8,15 @@
 //! cabot is inspired by the cURL command line tool, but focus on the
 //! http protocol which is the referent in HTTP client library.
 //!
-//! # Examples:
+//! ## Examples:
 //!
-//! ## Command Line:
+//! ### Command Line:
 //!
 //! ```bash
 //! $ cargo run -- https://www.rust-lang.org/ 2>&1| head -n 20 | grep 'name="description"'
 //!     <meta name="description" content="A language empowering everyone to build reliable and efficient software.">
 //! ```
-//! ## Library:
+//! ### Library:
 //!
 //! ```
 //! use async_std::task;
@@ -31,7 +31,29 @@
 //!
 //! ```
 //!
-//! # Why cabot ?
+//! ## Features
+//! 
+//! There is no default features set.
+//! 
+//!  * `pretty_log`: add pretty_env_logger dependency.
+//! 
+//! If set, pretty_env_logger is initalize for the CLI command,
+//! it has no effect as using cabot as a library.
+//! 
+//! Usage:
+//! 
+//!     RUST_LOG=cabot cargo run --features=pretty_log  -- <url>
+//! 
+//!  * `json`: add `serde_json` dependency.
+//! 
+//! If set, the [RequestBuilder](request/struct.RequestBuilder.html) struct 
+//! as a method `set_body_as_json()`, in order to
+//! serialize a struct that implement serde `Serialize` using `serde_json`,
+//! and the [Response](response/struct.Response.html) structure a method `json()`
+//! that deserialize a json to an object implementing serde Deserialize 
+//! using serde_json.
+//!
+//! ## Why cabot ?
 //!
 //! To get a simple rust native https client. No binding to OpenSSL.
 //!

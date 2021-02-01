@@ -23,20 +23,6 @@ Usge:
 
 Use `-h` for more options.
 
-## Features
-
-There is no default features set.
-
- * `pretty_log`: add pretty_env_logger dependency.
-
-If set, pretty_env_logger is initalize for the CLI command,
-it has no effect as using cabot as a library.
-
-Usage:
-
-    RUST_LOG=cabot cargo run --features=pretty_log  -- <url>
-
-
 ## License
 
 BSD 3-Clause License
@@ -45,9 +31,10 @@ BSD 3-Clause License
 
 There are many projects that should be used instead of mine.
 
- * [reqwest](https://crates.io/crates/reqwest)
- * [ureq](https://github.com/algesten/ureq)
- * [curl](https://crates.io/crates/curl)
+ * [surf](https://crates.io/crates/surf) - use async std too
+ * [reqwest](https://crates.io/crates/reqwest) - the most used one
+ * [ureq](https://github.com/algesten/ureq) - a minimal http client
+ * [curl](https://crates.io/crates/curl) - bindings of libcurl
 
 See also [a smoke tested lists of http client in rust](https://medium.com/@shnatsel/smoke-testing-rust-http-clients-b8f2ee5db4e6)
 for more choice.

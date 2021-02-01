@@ -112,6 +112,7 @@ impl Response {
         Ok(body)
     }
 
+    /// Get the result of the body in a deserialized object using serde_json.
     #[cfg(feature = "json")]
     pub fn json<T: DeserializeOwned>(&self) -> CabotResult<T> {
         let body = serde_json::from_slice(self.body.as_ref().unwrap_or(&Vec::new()).as_slice())?;
