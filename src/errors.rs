@@ -7,6 +7,9 @@ use async_std::io::Error as IOError;
 use rustls::TLSError;
 use url::ParseError as UrlParseError;
 
+#[cfg(feature = "json")]
+use serde_json;
+
 #[derive(Debug)]
 /// Errors in cabot
 pub enum CabotError {
@@ -21,6 +24,8 @@ pub enum CabotError {
     EncodingError(FromUtf8Error),
     IOError(IOError),
     UrlParseError(UrlParseError),
+    #[cfg(feature = "json")]
+    JsonError(serde_json::Error),
 }
 
 impl Display for CabotError {
@@ -41,6 +46,8 @@ impl Display for CabotError {
             CabotError::MaxRedirectionAttempt(max_redir) => {
                 format!("Maximum redirection attempt: {}", max_redir)
             }
+            #[cfg(feature = "json")]
+            CabotError::JsonError(err) => format!("Json Error: {}", err),
         };
         write!(f, "{}", description)
     }
@@ -80,5 +87,12 @@ impl From<IOError> for CabotError {
 impl From<UrlParseError> for CabotError {
     fn from(err: UrlParseError) -> CabotError {
         CabotError::UrlParseError(err)
+    }
+}
+
+#[cfg(feature = "json")]
+impl From<serde_json::Error> for CabotError {
+    fn from(err: serde_json::Error) -> CabotError {
+        CabotError::JsonError(err)
     }
 }
