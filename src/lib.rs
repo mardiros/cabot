@@ -42,7 +42,8 @@
 //! 
 //! Usage:
 //! 
-//!     RUST_LOG=cabot cargo run --features=pretty_log  -- <url>
+//! RUST_LOG=cabot cargo run --features=pretty_log  -- <url>
+//! 
 //! 
 //!  * `json`: add `serde_json` dependency.
 //! 

@@ -24,7 +24,7 @@ When I run "cabot --help"
 Then the status code is "0"
 And stdout display
     """
-    cabot 0.6.0
+    cabot 0.7.1
     Guillaume Gauvrit <guillaume@gauvr.it>
     Simple HTTP Client.
 
@@ -50,7 +50,7 @@ And stdout display
             --max-time <REQUEST_TIMEOUT>           timeout for the whole http request in seconds (0 means no timeout)
                                                    [default: 0]
             --resolve <RESOLVE>...                 <host:port:address> Resolve the host+port to this address
-        -A, --user-agent <UA>                      The user-agent HTTP header to use [default: cabot/0.6.0]
+        -A, --user-agent <UA>                      The user-agent HTTP header to use [default: cabot/0.7.1]
 
     ARGS:
         <URL>    URL to request

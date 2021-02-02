@@ -1,4 +1,5 @@
 test:
+    cargo test
     cd tests/functionals && poetry install && poetry run behave
 
 doc:
